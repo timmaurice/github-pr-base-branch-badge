@@ -2,7 +2,7 @@
 
 A Chrome extension that shows the base (target) branch of pull requests in GitHub's PR list view as a colored badge, and lets you filter by one or more base branches.
 
-![PR list with color-coded base branch badges next to each pull request, plus the "Target Branch" filter button in the toolbar](screenshots/pr-list-badges.png)
+<img src="screenshots/pr-list-badges.png" alt="PR list with color-coded base branch badges next to each pull request, plus the &quot;Target Branch&quot; filter button in the toolbar" width="800">
 
 ## Features
 
@@ -33,13 +33,13 @@ No Node/npm required — just download and load the extension:
 3. **"Base Branch ▾"** opens a dropdown with checkboxes for all known branches — several can be checked at once, the selection applies immediately; the number on the button shows the count of active filters
 4. **Clicking the extension icon** opens the settings popup: change colors, add/rename/remove branches, set/test a token, switch language (EN/DE, applies immediately), reset discovered branches, save
 
-![The "Filter by target branch" dropdown open, with a checkbox and color dot per known branch](screenshots/filter-dropdown.png)
+<img src="screenshots/filter-dropdown.png" alt="The &quot;Filter by target branch&quot; dropdown open, with a checkbox and color dot per known branch" width="350">
 
 ### Default branch colors
 
 Out of the box, the popup ships with four example entries — `main`, `develop`, `staging`, and a `release/*` wildcard (matching `release/1.0`, `release/my-feature`, ...) — plus the `default` fallback color for everything else. These are just a starting point: add, rename, or remove entries in the popup to match your own repo's branches.
 
-![The settings popup, listing branch entries (develop, feat/*, main, release/*) each with a drag handle, color swatch, hex input and live preview, plus the Default fallback row and Save/Reset buttons](screenshots/popup-settings.png)
+<img src="screenshots/popup-settings.png" alt="The settings popup, listing branch entries (develop, feat/*, main, release/*) each with a drag handle, color swatch, hex input and live preview, plus the Default fallback row and Save/Reset buttons" width="400">
 
 ### Wildcard patterns and priority
 
