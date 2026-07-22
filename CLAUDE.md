@@ -19,12 +19,12 @@ There is no build/lint/test command. To develop and verify changes:
 
 ## Architecture
 
-Four files, each with one job:
-
 - **`manifest.json`** — MV3 config. Content script matches all of `https://github.com/*` (not just `*/pulls*`/`*/issues*`) — PR detail pages are `/pull/<n>` (singular), a distinct pattern, and landing there first (or navigating list → detail → list via Turbo) must not leave the script uninjected. `content.js` itself gates what actually runs per page (see Turbo note below); running the script harmlessly on unrelated pages is the tradeoff.
 - **`content.js`** — injected into GitHub PR/issue pages. Finds PR rows, resolves each PR's base branch, injects badges and the branch-filter dropdown. This is where almost all logic lives.
-- **`background.js`** — MV3 service worker. Its only job is mediating `chrome.storage.local` reads/writes for the 24h base-branch cache, since it's simpler for `content.js` to message the worker than juggle storage directly for this cache layer.
-- **`popup.js`** / **`popup.html`** — settings popup (branch → color map, GitHub token). No separate options page exists; all config is in the popup.
+- **`background.js`** — MV3 service worker. Mediates `chrome.storage.local` reads/writes for the 24h base-branch cache, and fetches `locales/*.json` on request (see i18n below) — both are things `content.js` can't or shouldn't do directly itself.
+- **`popup.js`** / **`popup.html`** — settings popup (branch → color map, GitHub token, UI language). No separate options page exists; all config is in the popup.
+- **`i18n.js`** — small loader used by both `content.js` and `popup.js`: requests a locale dict from `background.js` via `chrome.runtime.sendMessage`, caches it in memory, and does `{placeholder}` interpolation. See "UI language / i18n" below for why it doesn't fetch directly.
+- **`locales/en.json`**, **`locales/de.json`** — one flat key→string JSON file per language. Add a language by adding a file here (same keys), registering it in `background.js`'s `LOCALE_FILES` map, and adding an `<option>` in `popup.html`.
 
 ### How the base branch is resolved
 
@@ -43,6 +43,12 @@ Every branch name ever seen in a badge is persisted to `chrome.storage.local` as
 ### Multi-branch filtering
 
 GitHub's search treats repeated `base:` qualifiers as OR: `base:master base:beta` matches either. The query helpers in `content.js` (`getSelectedBaseBranches`, `buildQueryForBaseBranches`, `navigateToQuery`) rely on this — no special grouping syntax needed. Clicking a badge is intentionally different from the dropdown: it replaces the whole selection with exactly that one branch; the toolbar dropdown is the only path to selecting multiple branches at once.
+
+### UI language / i18n
+
+Popup has an EN/DE language selector (`uiLanguage` in `chrome.storage.local`, default `en`); switching it re-renders the popup immediately and broadcasts `reloadBadges` to open `github.com` tabs so `content.js` rebuilds the filter button/popover in the new language.
+
+`content.js` cannot `fetch(chrome.runtime.getURL('locales/en.json'))` directly — content scripts inherit the host page's CSP for `fetch()`/`XHR`, and GitHub's CSP blocks the request to the `chrome-extension://` URL (this was tried and failed with a console error before landing on the current approach). `background.js` (a service worker, not subject to page CSP) fetches the JSON instead; `content.js`/`popup.js` request it via `chrome.runtime.sendMessage({ action: 'getLocaleDict', lang })` through `i18n.js`, same shape as the existing branch-cache messaging. Don't "simplify" this back to a direct fetch in `content.js`.
 
 ### Turbo navigation (issues ⟷ pulls)
 

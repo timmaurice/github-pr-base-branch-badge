@@ -9,15 +9,84 @@ const DEFAULT_COLORS = {
 const NEW_BRANCH_PALETTE = ['#8b5cf6', '#06b6d4', '#ec4899', '#84cc16', '#f59e0b', '#14b8a6'];
 let paletteIndex = 0;
 
+// Current UI language and the branch-color map currently rendered — kept in
+// memory so a language switch can re-render immediately without a storage
+// round-trip.
+let currentLang = I18N_DEFAULT_LANG;
+let currentColors = DEFAULT_COLORS;
+
+function t(key, args) {
+  return i18nText(currentLang, key, args);
+}
+
 const list = document.getElementById('branches-list');
 const tokenInput = document.getElementById('github-token');
+const tokenToggleBtn = document.getElementById('token-toggle-btn');
 const tokenTestBtn = document.getElementById('token-test-btn');
 const tokenTestResult = document.getElementById('token-test-result');
+const languageSelect = document.getElementById('language-select');
+const clearDiscoveredBtn = document.getElementById('clear-discovered-btn');
 
 document.addEventListener('DOMContentLoaded', loadSettings);
 document.getElementById('save-btn').addEventListener('click', saveSettings);
 document.getElementById('reset-btn').addEventListener('click', resetSettings);
 tokenTestBtn.addEventListener('click', testToken);
+tokenToggleBtn.addEventListener('click', toggleTokenVisibility);
+languageSelect.addEventListener('change', onLanguageChange);
+clearDiscoveredBtn.addEventListener('click', clearDiscoveredBranches);
+
+// Broadcasts a message to every open github.com tab so content.js can react
+// (rebuild badges/filter UI) without requiring a manual page reload.
+function broadcastToGithubTabs(action) {
+  chrome.tabs.query({ url: '*://github.com/*' }, (tabs) => {
+    tabs.forEach((tab) => {
+      chrome.tabs.sendMessage(tab.id, { action }).catch(() => {});
+    });
+  });
+}
+
+function toggleTokenVisibility() {
+  const showing = tokenInput.type === 'text';
+  tokenInput.type = showing ? 'password' : 'text';
+  tokenToggleBtn.textContent = showing ? '👁' : '🙈';
+  tokenToggleBtn.title = showing ? t('tokenShowLabel') : t('tokenHideLabel');
+}
+
+function onLanguageChange() {
+  currentLang = languageSelect.value;
+  chrome.storage.local.set({ uiLanguage: currentLang }, () => {
+    i18nReady(currentLang, () => {
+      applyStaticTranslations();
+      renderRows(currentColors);
+      broadcastToGithubTabs('reloadBadges');
+    });
+  });
+}
+
+function clearDiscoveredBranches() {
+  if (!window.confirm(t('clearDiscoveredConfirm'))) return;
+
+  chrome.storage.local.set({ discoveredBranches: [] }, () => {
+    broadcastToGithubTabs('clearDiscoveredBranches');
+    showStatus(t('clearDiscoveredDone'), 'success');
+  });
+}
+
+// Applies translated text to the elements that don't get rebuilt by
+// renderRows() (header, token section, action buttons, etc).
+function applyStaticTranslations() {
+  document.documentElement.lang = currentLang;
+  languageSelect.value = currentLang;
+  languageSelect.title = t('languageLabel');
+
+  document.getElementById('token-optional-text').textContent = t('tokenOptional');
+  tokenTestBtn.textContent = t('tokenTestBtn');
+  tokenToggleBtn.title = tokenInput.type === 'text' ? t('tokenHideLabel') : t('tokenShowLabel');
+  document.getElementById('token-hint-text').innerHTML = t('tokenHintHtml');
+  document.getElementById('save-btn').textContent = t('saveBtn');
+  document.getElementById('reset-btn').textContent = t('resetBtn');
+  clearDiscoveredBtn.textContent = t('clearDiscoveredBtn');
+}
 
 // Verifies the token in the input field (not the saved one) against the
 // GitHub API: /user confirms authentication and the rate-limit headers on
@@ -26,7 +95,7 @@ async function testToken() {
   const token = tokenInput.value.trim();
 
   tokenTestBtn.disabled = true;
-  tokenTestBtn.textContent = 'Teste…';
+  tokenTestBtn.textContent = t('tokenTesting');
   tokenTestResult.className = 'token-test-result';
 
   try {
@@ -36,28 +105,28 @@ async function testToken() {
     const response = await fetch('https://api.github.com/user', { headers });
     const limit = response.headers.get('x-ratelimit-limit');
     const remaining = response.headers.get('x-ratelimit-remaining');
-    const quota = limit ? ` — Rate-Limit: ${remaining}/${limit} übrig` : '';
+    const quota = limit ? t('rateLimitSuffix', { remaining, limit }) : '';
 
     if (!token) {
       showTokenResult(
         response.status === 401
-          ? `Kein Token eingetragen — nur öffentliche Repos, Limit 60/h${quota}`
-          : `Unerwartete Antwort ohne Token (${response.status})`,
+          ? t('tokenTestNoToken', { quota })
+          : t('tokenTestUnexpected', { status: response.status }),
         'error'
       );
     } else if (response.ok) {
       const user = await response.json();
-      showTokenResult(`✓ Token gültig — angemeldet als ${user.login}${quota}`, 'success');
+      showTokenResult(t('tokenTestValid', { login: user.login, quota }), 'success');
     } else if (response.status === 401) {
-      showTokenResult('✗ Token ungültig oder abgelaufen (401)', 'error');
+      showTokenResult(t('tokenTestInvalid'), 'error');
     } else {
-      showTokenResult(`✗ Test fehlgeschlagen (${response.status})${quota}`, 'error');
+      showTokenResult(t('tokenTestFailed', { status: response.status, quota }), 'error');
     }
   } catch (err) {
-    showTokenResult(`✗ Netzwerkfehler: ${err.message}`, 'error');
+    showTokenResult(t('tokenTestNetworkError', { message: err.message }), 'error');
   } finally {
     tokenTestBtn.disabled = false;
-    tokenTestBtn.textContent = 'Testen';
+    tokenTestBtn.textContent = t('tokenTestBtn');
   }
 }
 
@@ -67,10 +136,16 @@ function showTokenResult(message, type) {
 }
 
 function loadSettings() {
-  chrome.storage.local.get(['branchColors', 'githubToken'], (result) => {
-    const colors = result.branchColors || DEFAULT_COLORS;
-    renderRows(colors);
-    tokenInput.value = result.githubToken || '';
+  chrome.storage.local.get(['branchColors', 'githubToken', 'uiLanguage'], (result) => {
+    currentLang = result.uiLanguage || I18N_DEFAULT_LANG;
+
+    i18nReady(currentLang, () => {
+      applyStaticTranslations();
+
+      currentColors = result.branchColors || DEFAULT_COLORS;
+      renderRows(currentColors);
+      tokenInput.value = result.githubToken || '';
+    });
   });
 }
 
@@ -88,7 +163,7 @@ function renderRows(colors) {
   const addBtn = document.createElement('button');
   addBtn.type = 'button';
   addBtn.className = 'add-branch-btn';
-  addBtn.textContent = '+ Branch hinzufügen';
+  addBtn.textContent = t('addBranchBtn');
   addBtn.addEventListener('click', addBranchRow);
   list.appendChild(addBtn);
 
@@ -105,17 +180,17 @@ function divider() {
 }
 
 // Flags empty or duplicate branch names as the user types, so mistakes
-// are visible immediately instead of only after clicking "Speichern".
+// are visible immediately instead of only after clicking "Save".
 function validateAllNameFields() {
   const inputs = Array.from(list.querySelectorAll('.branch-name-input'));
   const valueCounts = {};
 
-  inputs.forEach(el => {
+  inputs.forEach((el) => {
     const value = el.value.trim();
     if (value) valueCounts[value] = (valueCounts[value] || 0) + 1;
   });
 
-  inputs.forEach(el => {
+  inputs.forEach((el) => {
     const value = el.value.trim();
     const isInvalid = !value || valueCounts[value] > 1;
     el.classList.toggle('invalid', isInvalid);
@@ -127,14 +202,14 @@ function buildRow(name, color, isDefault) {
   if (isDefault) {
     nameEl = document.createElement('span');
     nameEl.className = 'branch-name';
-    nameEl.textContent = 'Standard';
-    nameEl.title = 'Fallback-Farbe für alle nicht konfigurierten Branches';
+    nameEl.textContent = t('defaultRowLabel');
+    nameEl.title = t('defaultRowTitle');
   } else {
     nameEl = document.createElement('input');
     nameEl.type = 'text';
     nameEl.className = 'branch-name-input';
     nameEl.value = name;
-    nameEl.placeholder = 'branch-name';
+    nameEl.placeholder = t('namePlaceholder');
   }
 
   const swatchWrapper = document.createElement('div');
@@ -161,7 +236,7 @@ function buildRow(name, color, isDefault) {
   const preview = document.createElement('span');
   preview.className = 'preview';
   preview.style.backgroundColor = color;
-  preview.textContent = isDefault ? 'other' : (name || 'branch');
+  preview.textContent = isDefault ? t('previewDefaultText') : name || t('previewPlaceholder');
 
   picker.addEventListener('input', () => {
     hex.value = picker.value;
@@ -172,7 +247,7 @@ function buildRow(name, color, isDefault) {
   hex.addEventListener('change', () => {
     const val = hex.value.trim();
     if (!val.match(/^#[0-9A-Fa-f]{6}$/)) {
-      showStatus('❌ Ungültige Farbe! Format: #RRGGBB', 'error');
+      showStatus(t('errorInvalidColor'), 'error');
       hex.value = picker.value;
       return;
     }
@@ -183,7 +258,7 @@ function buildRow(name, color, isDefault) {
 
   if (!isDefault) {
     nameEl.addEventListener('input', () => {
-      preview.textContent = nameEl.value.trim() || 'branch';
+      preview.textContent = nameEl.value.trim() || t('previewPlaceholder');
       validateAllNameFields();
     });
   }
@@ -196,8 +271,8 @@ function buildRow(name, color, isDefault) {
     removeBtn.style.visibility = 'hidden';
   } else {
     removeBtn.textContent = '✕';
-    removeBtn.title = 'Branch entfernen';
-    removeBtn.setAttribute('aria-label', `Branch "${name}" entfernen`);
+    removeBtn.title = t('removeBranchTitle');
+    removeBtn.setAttribute('aria-label', t('removeBranchAriaLabel', { name }));
     removeBtn.addEventListener('click', () => {
       const rowEls = [nameEl, swatchWrapper, hex, preview, removeBtn];
       const idx = Array.from(list.children).indexOf(nameEl);
@@ -206,7 +281,7 @@ function buildRow(name, color, isDefault) {
       if (prevDivider && prevDivider.classList.contains('row-divider')) {
         prevDivider.remove();
       }
-      rowEls.forEach(el => el.remove());
+      rowEls.forEach((el) => el.remove());
       validateAllNameFields();
     });
   }
@@ -219,11 +294,9 @@ function addBranchRow() {
   const color = NEW_BRANCH_PALETTE[paletteIndex % NEW_BRANCH_PALETTE.length];
   paletteIndex++;
 
-  // Insert a divider + new row right before the default row's preceding divider...
-  // Simpler: insert right before the add button.
   const dividerEl = divider();
   list.insertBefore(dividerEl, addBtn);
-  buildRow('', color, false).forEach(el => list.insertBefore(el, addBtn));
+  buildRow('', color, false).forEach((el) => list.insertBefore(el, addBtn));
 
   const newNameInput = dividerEl.nextSibling;
   if (newNameInput && newNameInput.focus) newNameInput.focus();
@@ -234,7 +307,7 @@ function addBranchRow() {
 function saveSettings() {
   const colors = {};
   const rows = Array.from(list.children).filter(
-    el => !el.classList.contains('row-divider') && !el.classList.contains('add-branch-btn')
+    (el) => !el.classList.contains('row-divider') && !el.classList.contains('add-branch-btn')
   );
 
   const seenNames = new Set();
@@ -247,9 +320,11 @@ function saveSettings() {
     const key = isDefault ? 'default' : nameEl.value.trim();
 
     if (!isDefault) {
-      if (!key) { continue; }
+      if (!key) {
+        continue;
+      }
       if (seenNames.has(key)) {
-        showStatus(`❌ Branch "${key}" ist doppelt`, 'error');
+        showStatus(t('errorDuplicate', { name: key }), 'error');
         hasError = true;
         continue;
       }
@@ -264,27 +339,21 @@ function saveSettings() {
   const githubToken = tokenInput.value.trim();
 
   chrome.storage.local.set({ branchColors: colors, githubToken }, () => {
-    showStatus('✓ Gespeichert!', 'success');
+    currentColors = colors;
+    showStatus(t('statusSaved'), 'success');
     renderRows(colors);
-
-    chrome.tabs.query({ url: '*://github.com/*' }, (tabs) => {
-      tabs.forEach(tab => {
-        chrome.tabs.sendMessage(tab.id, { action: 'reloadBadges' }).catch(() => {});
-      });
-    });
+    broadcastToGithubTabs('reloadBadges');
   });
 }
 
 function resetSettings() {
-  chrome.storage.local.set({ branchColors: DEFAULT_COLORS }, () => {
-    renderRows(DEFAULT_COLORS);
-    showStatus('✓ Zurückgesetzt!', 'success');
+  if (!window.confirm(t('confirmReset'))) return;
 
-    chrome.tabs.query({ url: '*://github.com/*' }, (tabs) => {
-      tabs.forEach(tab => {
-        chrome.tabs.sendMessage(tab.id, { action: 'reloadBadges' }).catch(() => {});
-      });
-    });
+  chrome.storage.local.set({ branchColors: DEFAULT_COLORS }, () => {
+    currentColors = DEFAULT_COLORS;
+    renderRows(DEFAULT_COLORS);
+    showStatus(t('statusReset'), 'success');
+    broadcastToGithubTabs('reloadBadges');
   });
 }
 

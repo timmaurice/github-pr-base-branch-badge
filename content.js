@@ -19,26 +19,27 @@ let branchColors = { ...DEFAULT_COLORS };
 // api.github.com is a different origin and doesn't receive github.com's
 // session cookies; also raises the rate limit from 60/h to 5000/h.
 let githubToken = '';
+// UI language for the filter button/popover/badge tooltips, set from the
+// popup's language selector (defaults to English).
+let uiLanguage = I18N_DEFAULT_LANG;
 
 // GitHub's pull-request octicon — fill uses currentColor so it always
 // matches the badge's own text color.
-const PULL_REQUEST_ICON_SVG = '<svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor" style="flex-shrink:0;"><path d="M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z"></path></svg>';
+const PULL_REQUEST_ICON_SVG =
+  '<svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor" style="flex-shrink:0;"><path d="M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z"></path></svg>';
 
 // Send message to background script for storage operations (no direct chrome.storage access)
 function getCachedBranch(prUrl) {
   return new Promise((resolve) => {
     try {
-      chrome.runtime.sendMessage(
-        { action: 'getCachedBranch', prUrl },
-        (response) => {
-          if (response && response.success) {
-            resolve(response.branch);
-          } else {
-            resolve(null);
-          }
+      chrome.runtime.sendMessage({ action: 'getCachedBranch', prUrl }, (response) => {
+        if (response && response.success) {
+          resolve(response.branch);
+        } else {
+          resolve(null);
         }
-      );
-    } catch (err) {
+      });
+    } catch {
       resolve(null); // Fallback if messaging fails
     }
   });
@@ -46,15 +47,12 @@ function getCachedBranch(prUrl) {
 
 function setCachedBranch(prUrl, branch) {
   try {
-    chrome.runtime.sendMessage(
-      { action: 'setCachedBranch', prUrl, branch },
-      (response) => {
-        if (response && response.success) {
-          // Silent - don't log every storage write
-        }
+    chrome.runtime.sendMessage({ action: 'setCachedBranch', prUrl, branch }, (response) => {
+      if (response && response.success) {
+        // Silent - don't log every storage write
       }
-    );
-  } catch (err) {
+    });
+  } catch {
     // Fallback if messaging fails - just continue
   }
 }
@@ -69,7 +67,7 @@ function isPRListPage() {
 // they're no longer visible in the (now filtered) PR list.
 function loadDiscoveredBranches() {
   chrome.storage.local.get('discoveredBranches', (result) => {
-    (result.discoveredBranches || []).forEach(b => discoveredBranches.add(b));
+    (result.discoveredBranches || []).forEach((b) => discoveredBranches.add(b));
   });
 }
 
@@ -87,13 +85,13 @@ function rememberDiscoveredBranch(branch) {
 function getSelectedBaseBranches() {
   const params = new URLSearchParams(window.location.search);
   const query = params.get('q') || '';
-  const matches = query.match(/base:([a-zA-Z0-9\-_.\/]+)/g) || [];
-  return matches.map(m => m.slice('base:'.length));
+  const matches = query.match(/base:([a-zA-Z0-9\-_./]+)/g) || [];
+  return matches.map((m) => m.slice('base:'.length));
 }
 
 function removeBaseFilters(query) {
   return query
-    .replace(/base:[a-zA-Z0-9\-_.\/]+/g, '')
+    .replace(/base:[a-zA-Z0-9\-_./]+/g, '')
     .replace(/\s{2,}/g, ' ')
     .trim();
 }
@@ -111,7 +109,7 @@ function buildQueryForBaseBranches(branches, originalQuery) {
 
   // GitHub treats repeated `base:` qualifiers as OR, so no grouping syntax
   // is needed — "base:master base:beta" already matches either branch.
-  const group = branches.map(b => `base:${b}`).join(' ');
+  const group = branches.map((b) => `base:${b}`).join(' ');
 
   if (query) {
     return `${query} ${group}`;
@@ -126,9 +124,11 @@ function navigateToQuery(query) {
 }
 
 function isDarkMode() {
-  return document.documentElement.getAttribute('data-color-mode') === 'dark' ||
+  return (
+    document.documentElement.getAttribute('data-color-mode') === 'dark' ||
     document.body.classList.contains('dark') ||
-    window.matchMedia('(prefers-color-scheme: dark)').matches;
+    window.matchMedia('(prefers-color-scheme: dark)').matches
+  );
 }
 
 // Fetch PR details and add base branch badge. Sequential on purpose — firing
@@ -204,28 +204,47 @@ async function fetchAndExtractBaseBranch(prUrl, prRow, prLink) {
       try {
         const errorBody = await response.clone().json();
         apiMessage = errorBody.message || '';
-      } catch (e) {
+      } catch {
         // Body wasn't JSON — proceed without it.
       }
 
       if (ssoHeader) {
         const ssoUrlMatch = ssoHeader.match(/url=(\S+)/);
         const ssoUrl = ssoUrlMatch ? ssoUrlMatch[1] : `https://github.com/orgs/${owner}/sso`;
-        console.warn(`Base Branch Badge: the token isn't authorized for SSO on "${owner}" (${prLabel}) — open ${ssoUrl}, click "Authorize", then reload the page.`);
+        console.warn(
+          `Base Branch Badge: the token isn't authorized for SSO on "${owner}" (${prLabel}) — open ${ssoUrl}, click "Authorize", then reload the page.`
+        );
       } else if (response.status === 404 && !githubToken) {
-        console.warn(`Base Branch Badge: 404 for ${prLabel} — private repos need a GitHub token in the extension popup settings.`);
+        console.warn(
+          `Base Branch Badge: 404 for ${prLabel} — private repos need a GitHub token in the extension popup settings.`
+        );
       } else if (response.status === 404 && githubToken) {
-        console.warn(`Base Branch Badge: 404 for ${prLabel} despite a token being set — for organization-owned repos, a fine-grained token needs the org's approval (Settings → Personal access tokens, on the org) or use a classic token with the "repo" scope instead.`);
+        console.warn(
+          `Base Branch Badge: 404 for ${prLabel} despite a token being set — for organization-owned repos, a fine-grained token needs the org's approval (Settings → Personal access tokens, on the org) or use a classic token with the "repo" scope instead.`
+        );
       } else if (response.status === 403 && response.headers.get('x-ratelimit-remaining') === '0') {
         const resetHeader = response.headers.get('x-ratelimit-reset');
-        const resetTime = resetHeader ? new Date(Number(resetHeader) * 1000).toLocaleTimeString() : 'unknown';
-        console.warn(`Base Branch Badge: primary API rate limit exhausted for ${prLabel} — resets at ${resetTime}. Add/replace the token in the extension popup settings for a higher limit.`);
+        const resetTime = resetHeader
+          ? new Date(Number(resetHeader) * 1000).toLocaleTimeString()
+          : 'unknown';
+        console.warn(
+          `Base Branch Badge: primary API rate limit exhausted for ${prLabel} — resets at ${resetTime}. Add/replace the token in the extension popup settings for a higher limit.`
+        );
       } else if (response.status === 403 && /secondary rate limit|abuse/i.test(apiMessage)) {
-        console.warn(`Base Branch Badge: hit GitHub's secondary rate limit for ${prLabel} (too many requests too quickly) — this should clear up within a minute; just retry.`);
+        console.warn(
+          `Base Branch Badge: hit GitHub's secondary rate limit for ${prLabel} (too many requests too quickly) — retrying automatically on the next scroll/scan.`
+        );
+        // Transient — unmark as processed so the next MutationObserver-triggered
+        // setupPRBadges() pass (e.g. on scroll) picks this row up again.
+        processedPRs.delete(prUrl);
       } else if (response.status === 403) {
-        console.warn(`Base Branch Badge: 403 for ${prLabel}${apiMessage ? ` — ${apiMessage}` : ''}`);
+        console.warn(
+          `Base Branch Badge: 403 for ${prLabel}${apiMessage ? ` — ${apiMessage}` : ''}`
+        );
       } else {
-        console.warn(`Base Branch Badge: API request failed (${response.status}) for ${prLabel}${apiMessage ? ` — ${apiMessage}` : ''}`);
+        console.warn(
+          `Base Branch Badge: API request failed (${response.status}) for ${prLabel}${apiMessage ? ` — ${apiMessage}` : ''}`
+        );
       }
       return;
     }
@@ -240,10 +259,15 @@ async function fetchAndExtractBaseBranch(prUrl, prRow, prLink) {
       setCachedBranch(prUrl, baseBranch);
       addBaseBranchBadge(prRow, prLink, baseBranch);
     } else {
-      console.warn(`Base Branch Badge: API response missing base.ref for ${owner}/${repo}#${number}`);
+      console.warn(
+        `Base Branch Badge: API response missing base.ref for ${owner}/${repo}#${number}`
+      );
     }
   } catch (error) {
     console.error('Base Branch Badge: error fetching PR from API', error);
+    // Network-level failures (offline, DNS hiccup, etc.) are transient —
+    // retry on the next scan instead of leaving this row badge-less forever.
+    processedPRs.delete(prUrl);
   }
 }
 
@@ -272,7 +296,7 @@ function addBaseBranchBadge(prRow, prLink, baseBranch) {
   // Clicking a badge selects ONLY this branch (replacing any other
   // selection) — the toolbar dropdown is the tool for multi-select.
   badge.href = `?q=${encodeURIComponent(buildQueryForBaseBranches([baseBranch]))}`;
-  badge.title = `Filter by target branch: ${baseBranch}`;
+  badge.title = i18nText(uiLanguage, 'badgeTitle', { branch: baseBranch });
 
   // Apply color styling
   badge.style.cssText = `
@@ -317,7 +341,7 @@ function adjustColor(color, amount) {
   const r = Math.max(0, Math.min(255, (c >> 16) + amount));
   const g = Math.max(0, Math.min(255, ((c >> 8) & 0xff) + amount));
   const b = Math.max(0, Math.min(255, (c & 0xff) + amount));
-  return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
+  return '#' + [r, g, b].map((x) => x.toString(16).padStart(2, '0')).join('');
 }
 
 // Adds a "Base Branch ▾" dropdown before the Author button, offering a
@@ -371,6 +395,8 @@ function ensureBaseBranchFilterButton() {
 
   const button = document.createElement('button');
   button.type = 'button';
+  button.setAttribute('aria-haspopup', 'true');
+  button.setAttribute('aria-expanded', 'false');
   button.style.cssText = `
     display: inline-flex;
     align-items: center;
@@ -384,11 +410,15 @@ function ensureBaseBranchFilterButton() {
     cursor: pointer;
     align-self: center;
   `;
-  button.addEventListener('mouseenter', () => { button.style.backgroundColor = colors.hover; });
-  button.addEventListener('mouseleave', () => { button.style.backgroundColor = 'transparent'; });
+  button.addEventListener('mouseenter', () => {
+    button.style.backgroundColor = colors.hover;
+  });
+  button.addEventListener('mouseleave', () => {
+    button.style.backgroundColor = 'transparent';
+  });
 
   const buttonLabel = document.createElement('span');
-  buttonLabel.textContent = 'Target Branch';
+  buttonLabel.textContent = i18nText(uiLanguage, 'filterButtonLabel');
 
   const buttonCount = document.createElement('span');
   buttonCount.className = 'base-branch-filter-count';
@@ -407,8 +437,11 @@ function ensureBaseBranchFilterButton() {
     line-height: 1;
   `;
 
+  // Same class GitHub's own "Author" button (right next to ours) uses for
+  // its arrow — reusing it (rather than our own SVG/glyph) guarantees a
+  // pixel-identical match via GitHub's already-loaded Primer CSS.
   const buttonArrow = document.createElement('span');
-  buttonArrow.textContent = '▾';
+  buttonArrow.className = 'dropdown-caret hide-sm';
 
   button.appendChild(buttonLabel);
   button.appendChild(buttonCount);
@@ -445,6 +478,7 @@ function ensureBaseBranchFilterButton() {
 
   function closePopover() {
     popover.style.display = 'none';
+    button.setAttribute('aria-expanded', 'false');
   }
 
   function renderPopoverContent() {
@@ -460,13 +494,13 @@ function ensureBaseBranchFilterButton() {
     `;
 
     const title = document.createElement('span');
-    title.textContent = 'Filter by target branch';
+    title.textContent = i18nText(uiLanguage, 'filterPopoverTitle');
     title.style.cssText = `font-weight: 600; font-size: 14px; color: ${colors.text};`;
 
     const closeBtn = document.createElement('button');
     closeBtn.type = 'button';
     closeBtn.textContent = '✕';
-    closeBtn.setAttribute('aria-label', 'Schließen');
+    closeBtn.setAttribute('aria-label', i18nText(uiLanguage, 'closeAriaLabel'));
     closeBtn.style.cssText = `
       width: 24px;
       height: 24px;
@@ -480,8 +514,12 @@ function ensureBaseBranchFilterButton() {
       font-size: 13px;
       cursor: pointer;
     `;
-    closeBtn.addEventListener('mouseenter', () => { closeBtn.style.backgroundColor = colors.hover; });
-    closeBtn.addEventListener('mouseleave', () => { closeBtn.style.backgroundColor = 'transparent'; });
+    closeBtn.addEventListener('mouseenter', () => {
+      closeBtn.style.backgroundColor = colors.hover;
+    });
+    closeBtn.addEventListener('mouseleave', () => {
+      closeBtn.style.backgroundColor = 'transparent';
+    });
     closeBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       closePopover();
@@ -495,14 +533,13 @@ function ensureBaseBranchFilterButton() {
     divider.style.cssText = `height: 1px; background: ${colors.divider}; flex-shrink: 0;`;
     popover.appendChild(divider);
 
-    const allBranches = Array.from(new Set([
-      ...Object.keys(branchColors).filter(k => k !== 'default'),
-      ...discoveredBranches
-    ])).sort();
+    const allBranches = Array.from(
+      new Set([...Object.keys(branchColors).filter((k) => k !== 'default'), ...discoveredBranches])
+    ).sort();
 
     if (allBranches.length === 0) {
       const empty = document.createElement('div');
-      empty.textContent = 'Noch keine Branches erkannt.';
+      empty.textContent = i18nText(uiLanguage, 'noBranchesDiscovered');
       empty.style.cssText = `padding: 14px; font-size: 12px; color: ${colors.muted};`;
       popover.appendChild(empty);
       return;
@@ -513,7 +550,7 @@ function ensureBaseBranchFilterButton() {
 
     const searchInput = document.createElement('input');
     searchInput.type = 'text';
-    searchInput.placeholder = 'Filter branches';
+    searchInput.placeholder = i18nText(uiLanguage, 'filterBranchesPlaceholder');
     searchInput.style.cssText = `
       width: 100%;
       padding: 6px 10px;
@@ -540,7 +577,7 @@ function ensureBaseBranchFilterButton() {
 
     const selected = new Set(getSelectedBaseBranches());
 
-    allBranches.forEach(branch => {
+    allBranches.forEach((branch) => {
       const row = document.createElement('label');
       row.dataset.branchName = branch.toLowerCase();
       row.style.cssText = `
@@ -553,8 +590,12 @@ function ensureBaseBranchFilterButton() {
         font-size: 13px;
         color: ${colors.text};
       `;
-      row.addEventListener('mouseenter', () => { row.style.backgroundColor = colors.hover; });
-      row.addEventListener('mouseleave', () => { row.style.backgroundColor = 'transparent'; });
+      row.addEventListener('mouseenter', () => {
+        row.style.backgroundColor = colors.hover;
+      });
+      row.addEventListener('mouseleave', () => {
+        row.style.backgroundColor = 'transparent';
+      });
 
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
@@ -589,7 +630,7 @@ function ensureBaseBranchFilterButton() {
 
     searchInput.addEventListener('input', () => {
       const term = searchInput.value.trim().toLowerCase();
-      listContainer.querySelectorAll('label').forEach(row => {
+      listContainer.querySelectorAll('label').forEach((row) => {
         row.style.display = row.dataset.branchName.includes(term) ? 'flex' : 'none';
       });
     });
@@ -598,11 +639,14 @@ function ensureBaseBranchFilterButton() {
   button.addEventListener('click', (e) => {
     e.stopPropagation();
     const willOpen = popover.style.display !== 'flex';
-    document.querySelectorAll('.base-branch-filter-popover').forEach(p => { p.style.display = 'none'; });
+    document.querySelectorAll('.base-branch-filter-popover').forEach((p) => {
+      p.style.display = 'none';
+    });
     if (willOpen) {
       renderPopoverContent();
       popover.style.display = 'flex';
     }
+    button.setAttribute('aria-expanded', String(willOpen));
   });
 
   document.addEventListener('click', (e) => {
@@ -641,20 +685,44 @@ function loadGithubToken(callback) {
   });
 }
 
+function loadUiLanguage(callback) {
+  chrome.storage.local.get('uiLanguage', (result) => {
+    uiLanguage = result.uiLanguage || I18N_DEFAULT_LANG;
+    // Fetches locales/*.json (see i18n.js) before calling back — every
+    // existing caller already treats loadUiLanguage as async, so this just
+    // extends what "ready" means without touching call sites.
+    i18nReady(uiLanguage, () => {
+      if (callback) callback();
+    });
+  });
+}
+
 // Listen for reload signal from popup
 chrome.runtime.onMessage.addListener((message) => {
   if (message.action === 'reloadBadges') {
     // Existing badges already have the old color baked in as inline styles,
     // so they must be removed before re-adding — setupPRBadges() skips rows
-    // that already have a badge.
-    document.querySelectorAll('.base-branch-badge').forEach(el => el.remove());
+    // that already have a badge. The filter button/popover is rebuilt too,
+    // since its label and options are baked in at creation time (language
+    // or newly-added branch colors wouldn't otherwise show up until the
+    // next full page load).
+    document.querySelectorAll('.base-branch-badge').forEach((el) => el.remove());
+    document.querySelectorAll('.base-branch-filter-btn').forEach((el) => el.remove());
     processedPRs.clear();
-    loadGithubToken(() => {
-      loadColorSettings(() => {
-        setupPRBadges();
-        refreshFilterUI();
+    loadUiLanguage(() => {
+      loadGithubToken(() => {
+        loadColorSettings(() => {
+          setupPRBadges();
+          refreshFilterUI();
+        });
       });
     });
+  }
+
+  if (message.action === 'clearDiscoveredBranches') {
+    discoveredBranches.clear();
+    document.querySelectorAll('.base-branch-filter-btn').forEach((el) => el.remove());
+    refreshFilterUI();
   }
 });
 
@@ -664,12 +732,14 @@ chrome.runtime.onMessage.addListener((message) => {
 // token's 5000/h) — chrome.storage.local.get is async and isn't guaranteed
 // to beat a fixed setTimeout.
 loadDiscoveredBranches();
-loadGithubToken(() => {
-  loadColorSettings(() => {
-    setTimeout(() => {
-      setupPRBadges();
-      refreshFilterUI();
-    }, 100);
+loadUiLanguage(() => {
+  loadGithubToken(() => {
+    loadColorSettings(() => {
+      setTimeout(() => {
+        setupPRBadges();
+        refreshFilterUI();
+      }, 100);
+    });
   });
 });
 
@@ -701,7 +771,7 @@ function handleNavigation({ clearBranchCache }) {
   // Old badge/chip/dropdown elements belonged to the DOM Turbo just swapped
   // out (or their href/state reflects the pre-navigation query) — drop them
   // so they get rebuilt fresh instead of skipped as "already present".
-  document.querySelectorAll('.base-branch-badge').forEach(el => el.remove());
+  document.querySelectorAll('.base-branch-badge').forEach((el) => el.remove());
   processedPRs.clear();
   if (clearBranchCache) branchCache.clear();
   attachBodyObserver();

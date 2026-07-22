@@ -1,0 +1,45 @@
+{
+  "filterButtonLabel": "Zielbranch",
+  "filterPopoverTitle": "Nach Zielbranch filtern",
+  "closeAriaLabel": "Schließen",
+  "noBranchesDiscovered": "Noch keine Branches erkannt.",
+  "filterBranchesPlaceholder": "Branches filtern",
+  "badgeTitle": "Nach Zielbranch filtern: {branch}",
+
+  "tokenOptional": "(optional, für private Repos)",
+  "tokenTestBtn": "Testen",
+  "tokenTesting": "Teste…",
+  "tokenShowLabel": "Token anzeigen",
+  "tokenHideLabel": "Token verbergen",
+  "tokenHintHtml": "Nötig für private Repos (api.github.com erhält keine github.com-Session-Cookies) und für ein höheres Rate-Limit. Ein Fine-grained Token mit Berechtigung \"Pull requests: Read-only\" reicht aus. <a href=\"https://github.com/settings/personal-access-tokens/new\" target=\"_blank\" rel=\"noopener\">Token erstellen ↗</a>",
+  "tokenTestNoToken": "Kein Token eingetragen — nur öffentliche Repos, Limit 60/h{quota}",
+  "tokenTestUnexpected": "Unerwartete Antwort ohne Token ({status})",
+  "tokenTestValid": "✓ Token gültig — angemeldet als {login}{quota}",
+  "tokenTestInvalid": "✗ Token ungültig oder abgelaufen (401)",
+  "tokenTestFailed": "✗ Test fehlgeschlagen ({status}){quota}",
+  "tokenTestNetworkError": "✗ Netzwerkfehler: {message}",
+  "rateLimitSuffix": " — Rate-Limit: {remaining}/{limit} übrig",
+
+  "languageLabel": "Sprache",
+
+  "saveBtn": "💾 Speichern",
+  "resetBtn": "↻ Zurücksetzen",
+  "confirmReset": "Alle Branch-Farben auf die Standardwerte zurücksetzen? Das kann nicht rückgängig gemacht werden.",
+  "addBranchBtn": "+ Branch hinzufügen",
+  "defaultRowLabel": "Standard",
+  "defaultRowTitle": "Fallback-Farbe für alle nicht konfigurierten Branches",
+  "previewDefaultText": "other",
+  "previewPlaceholder": "branch",
+  "namePlaceholder": "branch-name",
+  "removeBranchTitle": "Branch entfernen",
+  "removeBranchAriaLabel": "Branch \"{name}\" entfernen",
+
+  "statusSaved": "✓ Gespeichert!",
+  "statusReset": "✓ Zurückgesetzt!",
+  "errorInvalidColor": "❌ Ungültige Farbe! Format: #RRGGBB",
+  "errorDuplicate": "❌ Branch \"{name}\" ist doppelt",
+
+  "clearDiscoveredBtn": "Erkannte Branches zurücksetzen",
+  "clearDiscoveredConfirm": "Alle erkannten Branch-Namen löschen? Sie tauchen wieder auf, sobald PRs neu gescannt werden.",
+  "clearDiscoveredDone": "✓ Zurückgesetzt!"
+}

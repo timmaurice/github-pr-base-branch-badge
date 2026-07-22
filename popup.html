@@ -1,468 +1,554 @@
-<!DOCTYPE html>
-<html lang="de">
-<head>
-  <meta charset="UTF-8">
-  <title>Base Branch Badge</title>
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    body {
-      width: 400px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      background: white;
-      color: #1f2937;
-    }
-
-    header {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 14px 16px;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-    }
-
-    header img {
-      width: 24px;
-      height: 24px;
-      border-radius: 6px;
-    }
-
-    header h1 {
-      font-size: 15px;
-      font-weight: 600;
-    }
-
-    .token-section {
-      padding: 12px 16px;
-      border-bottom: 1px solid #f3f4f6;
-    }
-
-    .token-label {
-      display: block;
-      font-size: 12px;
-      font-weight: 600;
-      margin-bottom: 6px;
-    }
-
-    .token-optional {
-      font-weight: 400;
-      color: #6b7280;
-    }
-
-    .token-input-row {
-      display: flex;
-      gap: 6px;
-    }
-
-    .token-input {
-      flex: 1;
-      min-width: 0;
-      padding: 6px 8px;
-      border: 1px solid #e5e7eb;
-      border-radius: 5px;
-      font-family: 'Monaco', 'Courier New', monospace;
-      font-size: 11px;
-      color: #1f2937;
-    }
-
-    .token-input:focus {
-      outline: none;
-      border-color: #667eea;
-    }
-
-    .token-test-btn {
-      flex-shrink: 0;
-      padding: 6px 10px;
-      border: 1px solid #e5e7eb;
-      border-radius: 5px;
-      background: #f3f4f6;
-      color: #374151;
-      font-size: 11px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all 0.15s ease;
-    }
-
-    .token-test-btn:hover {
-      background: #e5e7eb;
-    }
-
-    .token-test-btn:disabled {
-      opacity: 0.6;
-      cursor: default;
-    }
-
-    .token-test-result {
-      margin-top: 6px;
-      font-size: 11px;
-      line-height: 1.4;
-      display: none;
-    }
-
-    .token-test-result.success {
-      display: block;
-      color: #10b981;
-    }
-
-    .token-test-result.error {
-      display: block;
-      color: #ef4444;
-    }
-
-    .token-hint {
-      margin-top: 6px;
-      font-size: 11px;
-      line-height: 1.4;
-      color: #6b7280;
-    }
-
-    .token-hint a {
-      color: #667eea;
-      text-decoration: none;
-    }
-
-    .token-hint a:hover {
-      text-decoration: underline;
-    }
-
-    .branches {
-      display: grid;
-      grid-template-columns: minmax(52px, 1fr) 32px 68px auto 22px;
-      align-items: center;
-      column-gap: 8px;
-      padding: 4px 16px;
-      max-height: 380px;
-      overflow-y: auto;
-    }
-
-    .branches > *:not(.row-divider):not(.add-branch-btn) {
-      padding-top: 9px;
-      padding-bottom: 9px;
-    }
-
-    .row-divider {
-      grid-column: 1 / -1;
-      height: 1px;
-      margin: 3px 0;
-      background: #f3f4f6;
-    }
-
-    .branch-name,
-    .branch-name-input {
-      font-size: 12px;
-      font-weight: 600;
-      color: #1f2937;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .branch-name-input {
-      width: 100%;
-      border: 1px solid transparent;
-      border-radius: 5px;
-      padding: 4px 5px;
-      background: transparent;
-      font-family: inherit;
-    }
-
-    .branch-name-input:hover {
-      border-color: #e5e7eb;
-    }
-
-    .branch-name-input:focus {
-      outline: none;
-      border-color: #667eea;
-      background: #f9fafb;
-    }
-
-    .branch-name-input.invalid {
-      border-color: #ef4444;
-      background: rgba(239, 68, 68, 0.08);
-    }
-
-    .color-swatch-wrapper {
-      position: relative;
-      width: 32px;
-      height: 32px;
-    }
-
-    .color-swatch-display {
-      position: absolute;
-      inset: 0;
-      border: 2px solid #e5e7eb;
-      border-radius: 6px;
-      pointer-events: none;
-    }
-
-    .color-picker {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      margin: 0;
-      padding: 0;
-      border: none;
-      opacity: 0;
-      cursor: pointer;
-    }
-
-    .color-text {
-      width: 100%;
-      padding: 5px 5px;
-      border: 1px solid #e5e7eb;
-      border-radius: 5px;
-      font-family: 'Monaco', 'Courier New', monospace;
-      font-size: 10.5px;
-      color: #1f2937;
-    }
-
-    .color-text:focus {
-      outline: none;
-      border-color: #667eea;
-    }
-
-    .preview {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: fit-content;
-      max-width: 90px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      justify-self: end;
-      padding: 4px 10px;
-      border-radius: 10px;
-      font-size: 11px;
-      font-weight: 500;
-      color: white;
-      white-space: nowrap;
-      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-    }
-
-    .remove-btn {
-      width: 22px;
-      height: 22px;
-      border: none;
-      border-radius: 5px;
-      background: transparent;
-      color: #9ca3af;
-      font-size: 14px;
-      line-height: 1;
-      cursor: pointer;
-      justify-self: center;
-    }
-
-    .remove-btn:hover {
-      background: #fee2e2;
-      color: #ef4444;
-    }
-
-    .add-branch-btn {
-      grid-column: 1 / -1;
-      margin-top: 4px;
-      padding: 7px;
-      border: 1px dashed #d1d5db;
-      border-radius: 6px;
-      background: transparent;
-      color: #6b7280;
-      font-size: 12px;
-      cursor: pointer;
-      transition: all 0.15s ease;
-    }
-
-    .add-branch-btn:hover {
-      border-color: #667eea;
-      color: #667eea;
-      background: #f5f6ff;
-    }
-
-    .actions {
-      display: flex;
-      gap: 8px;
-      padding: 12px 16px;
-      border-top: 1px solid #e5e7eb;
-    }
-
-    .btn {
-      flex: 1;
-      padding: 8px 12px;
-      border: none;
-      border-radius: 6px;
-      font-size: 12px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all 0.15s ease;
-    }
-
-    .btn-primary {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-    }
-
-    .btn-primary:hover {
-      opacity: 0.9;
-    }
-
-    .btn-secondary {
-      background: #f3f4f6;
-      color: #374151;
-      border: 1px solid #e5e7eb;
-    }
-
-    .btn-secondary:hover {
-      background: #e5e7eb;
-    }
-
-    .status {
-      padding: 0 16px 8px;
-      font-size: 11px;
-      text-align: center;
-      min-height: 14px;
-    }
-
-    .status.success {
-      color: #10b981;
-      font-weight: 500;
-    }
-
-    .status.error {
-      color: #ef4444;
-      font-weight: 500;
-    }
-
-    @media (prefers-color-scheme: dark) {
-      body {
-        background: #1f2937;
-        color: #f3f4f6;
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Base Branch Badge</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
       }
 
-      .row-divider {
-        background: #374151;
+      body {
+        width: 400px;
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        background: white;
+        color: #1f2937;
+      }
+
+      header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 14px 16px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+      }
+
+      header img {
+        width: 24px;
+        height: 24px;
+        border-radius: 6px;
+      }
+
+      header h1 {
+        font-size: 15px;
+        font-weight: 600;
+        flex: 1;
+      }
+
+      #language-select {
+        padding: 4px 6px;
+        border-radius: 5px;
+        border: 1px solid rgba(255, 255, 255, 0.4);
+        background: rgba(255, 255, 255, 0.15);
+        color: white;
+        font-size: 11px;
+        cursor: pointer;
+      }
+
+      #language-select option {
+        color: #1f2937;
       }
 
       .token-section {
-        border-color: #374151;
+        padding: 12px 16px;
+        border-bottom: 1px solid #f3f4f6;
       }
 
-      .token-optional,
-      .token-hint {
-        color: #9ca3af;
+      .token-label {
+        display: block;
+        font-size: 12px;
+        font-weight: 600;
+        margin-bottom: 6px;
+      }
+
+      .token-optional {
+        font-weight: 400;
+        color: #6b7280;
+      }
+
+      .token-input-row {
+        display: flex;
+        gap: 6px;
       }
 
       .token-input {
-        background: #111827;
-        border-color: #4b5563;
-        color: #f3f4f6;
+        flex: 1;
+        min-width: 0;
+        padding: 6px 8px;
+        border: 1px solid #e5e7eb;
+        border-radius: 5px;
+        font-family: 'Monaco', 'Courier New', monospace;
+        font-size: 11px;
+        color: #1f2937;
+      }
+
+      .token-input:focus {
+        outline: none;
+        border-color: #667eea;
       }
 
       .token-test-btn {
-        background: #374151;
-        color: #f3f4f6;
-        border-color: #4b5563;
+        flex-shrink: 0;
+        padding: 6px 10px;
+        border: 1px solid #e5e7eb;
+        border-radius: 5px;
+        background: #f3f4f6;
+        color: #374151;
+        font-size: 11px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.15s ease;
       }
 
       .token-test-btn:hover {
-        background: #4b5563;
+        background: #e5e7eb;
+      }
+
+      .token-test-btn:disabled {
+        opacity: 0.6;
+        cursor: default;
+      }
+
+      .token-test-result {
+        margin-top: 6px;
+        font-size: 11px;
+        line-height: 1.4;
+        display: none;
+      }
+
+      .token-test-result.success {
+        display: block;
+        color: #10b981;
+      }
+
+      .token-test-result.error {
+        display: block;
+        color: #ef4444;
+      }
+
+      .token-hint {
+        margin-top: 6px;
+        font-size: 11px;
+        line-height: 1.4;
+        color: #6b7280;
+      }
+
+      .token-hint a {
+        color: #667eea;
+        text-decoration: none;
+      }
+
+      .token-hint a:hover {
+        text-decoration: underline;
+      }
+
+      .branches {
+        display: grid;
+        grid-template-columns: minmax(52px, 1fr) 32px 68px auto 22px;
+        align-items: center;
+        column-gap: 8px;
+        padding: 4px 16px;
+        max-height: 380px;
+        overflow-y: auto;
+      }
+
+      .branches > *:not(.row-divider):not(.add-branch-btn) {
+        padding-top: 9px;
+        padding-bottom: 9px;
+      }
+
+      .row-divider {
+        grid-column: 1 / -1;
+        height: 1px;
+        margin: 3px 0;
+        background: #f3f4f6;
       }
 
       .branch-name,
       .branch-name-input {
-        color: #f3f4f6;
+        font-size: 12px;
+        font-weight: 600;
+        color: #1f2937;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .branch-name-input {
+        width: 100%;
+        border: 1px solid transparent;
+        border-radius: 5px;
+        padding: 4px 5px;
+        background: transparent;
+        font-family: inherit;
       }
 
       .branch-name-input:hover {
-        border-color: #4b5563;
+        border-color: #e5e7eb;
       }
 
       .branch-name-input:focus {
-        background: #111827;
+        outline: none;
+        border-color: #667eea;
+        background: #f9fafb;
       }
 
       .branch-name-input.invalid {
-        border-color: #f87171;
-        background: rgba(248, 113, 113, 0.12);
+        border-color: #ef4444;
+        background: rgba(239, 68, 68, 0.08);
+      }
+
+      .color-swatch-wrapper {
+        position: relative;
+        width: 32px;
+        height: 32px;
       }
 
       .color-swatch-display {
-        border-color: #4b5563;
+        position: absolute;
+        inset: 0;
+        border: 2px solid #e5e7eb;
+        border-radius: 6px;
+        pointer-events: none;
+      }
+
+      .color-picker {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        border: none;
+        opacity: 0;
+        cursor: pointer;
       }
 
       .color-text {
-        background: #111827;
-        border-color: #4b5563;
-        color: #f3f4f6;
+        width: 100%;
+        padding: 5px 5px;
+        border: 1px solid #e5e7eb;
+        border-radius: 5px;
+        font-family: 'Monaco', 'Courier New', monospace;
+        font-size: 10.5px;
+        color: #1f2937;
+      }
+
+      .color-text:focus {
+        outline: none;
+        border-color: #667eea;
+      }
+
+      .preview {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: fit-content;
+        max-width: 90px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        justify-self: end;
+        padding: 4px 10px;
+        border-radius: 10px;
+        font-size: 11px;
+        font-weight: 500;
+        color: white;
+        white-space: nowrap;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
       }
 
       .remove-btn {
-        color: #6b7280;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 22px;
+        height: 22px;
+        padding: 0;
+        border: none;
+        border-radius: 5px;
+        background: transparent;
+        color: #9ca3af;
+        font-size: 14px;
+        line-height: 1;
+        cursor: pointer;
+        justify-self: center;
       }
 
       .remove-btn:hover {
-        background: #450a0a;
-        color: #f87171;
+        background: #fee2e2;
+        color: #ef4444;
       }
 
       .add-branch-btn {
-        border-color: #4b5563;
-        color: #9ca3af;
+        grid-column: 1 / -1;
+        margin-top: 4px;
+        padding: 7px;
+        border: 1px dashed #d1d5db;
+        border-radius: 6px;
+        background: transparent;
+        color: #6b7280;
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.15s ease;
       }
 
       .add-branch-btn:hover {
-        border-color: #818cf8;
-        color: #818cf8;
-        background: #1e1b4b;
-      }
-
-      .btn-secondary {
-        background: #374151;
-        color: #f3f4f6;
-        border-color: #4b5563;
-      }
-
-      .btn-secondary:hover {
-        background: #4b5563;
+        border-color: #667eea;
+        color: #667eea;
+        background: #f5f6ff;
       }
 
       .actions {
-        border-color: #374151;
+        display: flex;
+        gap: 8px;
+        padding: 12px 16px;
+        border-top: 1px solid #e5e7eb;
       }
-    }
-  </style>
-</head>
-<body>
-  <header>
-    <img src="icon48.png" alt="">
-    <h1>Base Branch Badge</h1>
-  </header>
 
-  <div class="token-section">
-    <label for="github-token" class="token-label">GitHub Token <span class="token-optional">(optional, für private Repos)</span></label>
-    <div class="token-input-row">
-      <input type="password" id="github-token" class="token-input" placeholder="ghp_... oder github_pat_...">
-      <button type="button" id="token-test-btn" class="token-test-btn">Testen</button>
+      .btn {
+        flex: 1;
+        padding: 8px 12px;
+        border: none;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+
+      .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+      }
+
+      .btn-primary:hover {
+        opacity: 0.9;
+      }
+
+      .btn-secondary {
+        background: #f3f4f6;
+        color: #374151;
+        border: 1px solid #e5e7eb;
+      }
+
+      .btn-secondary:hover {
+        background: #e5e7eb;
+      }
+
+      .status {
+        padding: 0 16px 8px;
+        font-size: 11px;
+        text-align: center;
+        min-height: 14px;
+      }
+
+      .status.success {
+        color: #10b981;
+        font-weight: 500;
+      }
+
+      .status.error {
+        color: #ef4444;
+        font-weight: 500;
+      }
+
+      .clear-discovered-row {
+        padding: 0 16px 10px;
+        text-align: center;
+      }
+
+      .clear-discovered-btn {
+        background: none;
+        border: none;
+        color: #6b7280;
+        font-size: 11px;
+        text-decoration: underline;
+        cursor: pointer;
+        padding: 2px;
+      }
+
+      .clear-discovered-btn:hover {
+        color: #ef4444;
+      }
+
+      .token-toggle-btn {
+        flex-shrink: 0;
+        width: 30px;
+        padding: 6px 0;
+        border: 1px solid #e5e7eb;
+        border-radius: 5px;
+        background: #f3f4f6;
+        color: #374151;
+        font-size: 12px;
+        cursor: pointer;
+      }
+
+      .token-toggle-btn:hover {
+        background: #e5e7eb;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        body {
+          background: #1f2937;
+          color: #f3f4f6;
+        }
+
+        .row-divider {
+          background: #374151;
+        }
+
+        .token-section {
+          border-color: #374151;
+        }
+
+        .token-optional,
+        .token-hint {
+          color: #9ca3af;
+        }
+
+        .token-input {
+          background: #111827;
+          border-color: #4b5563;
+          color: #f3f4f6;
+        }
+
+        .token-test-btn {
+          background: #374151;
+          color: #f3f4f6;
+          border-color: #4b5563;
+        }
+
+        .token-test-btn:hover {
+          background: #4b5563;
+        }
+
+        .branch-name,
+        .branch-name-input {
+          color: #f3f4f6;
+        }
+
+        .branch-name-input:hover {
+          border-color: #4b5563;
+        }
+
+        .branch-name-input:focus {
+          background: #111827;
+        }
+
+        .branch-name-input.invalid {
+          border-color: #f87171;
+          background: rgba(248, 113, 113, 0.12);
+        }
+
+        .color-swatch-display {
+          border-color: #4b5563;
+        }
+
+        .color-text {
+          background: #111827;
+          border-color: #4b5563;
+          color: #f3f4f6;
+        }
+
+        .remove-btn {
+          color: #6b7280;
+        }
+
+        .remove-btn:hover {
+          background: #450a0a;
+          color: #f87171;
+        }
+
+        .add-branch-btn {
+          border-color: #4b5563;
+          color: #9ca3af;
+        }
+
+        .add-branch-btn:hover {
+          border-color: #818cf8;
+          color: #818cf8;
+          background: #1e1b4b;
+        }
+
+        .btn-secondary {
+          background: #374151;
+          color: #f3f4f6;
+          border-color: #4b5563;
+        }
+
+        .btn-secondary:hover {
+          background: #4b5563;
+        }
+
+        .actions {
+          border-color: #374151;
+        }
+
+        .token-toggle-btn {
+          background: #374151;
+          color: #f3f4f6;
+          border-color: #4b5563;
+        }
+
+        .token-toggle-btn:hover {
+          background: #4b5563;
+        }
+
+        .clear-discovered-btn {
+          color: #9ca3af;
+        }
+
+        .clear-discovered-btn:hover {
+          color: #f87171;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <img src="icon48.png" alt="" />
+      <h1>Base Branch Badge</h1>
+      <select id="language-select">
+        <option value="en">EN</option>
+        <option value="de">DE</option>
+      </select>
+    </header>
+
+    <div class="token-section">
+      <label for="github-token" class="token-label"
+        >GitHub Token <span class="token-optional" id="token-optional-text"></span
+      ></label>
+      <div class="token-input-row">
+        <input
+          type="password"
+          id="github-token"
+          class="token-input"
+          placeholder="ghp_... or github_pat_..."
+        />
+        <button type="button" id="token-toggle-btn" class="token-toggle-btn">👁</button>
+        <button type="button" id="token-test-btn" class="token-test-btn"></button>
+      </div>
+      <p id="token-test-result" class="token-test-result"></p>
+      <p class="token-hint" id="token-hint-text"></p>
     </div>
-    <p id="token-test-result" class="token-test-result"></p>
-    <p class="token-hint">
-      Nötig für private Repos (api.github.com erhält keine github.com-Session-Cookies) und für ein höheres Rate-Limit.
-      Ein Fine-grained Token mit Berechtigung "Pull requests: Read-only" reicht aus.
-      <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Token erstellen ↗</a>
-    </p>
-  </div>
 
-  <div class="branches" id="branches-list"></div>
+    <div class="branches" id="branches-list"></div>
 
-  <div class="actions">
-    <button id="save-btn" class="btn btn-primary">💾 Speichern</button>
-    <button id="reset-btn" class="btn btn-secondary">↻ Zurücksetzen</button>
-  </div>
-  <div id="status" class="status"></div>
+    <div class="clear-discovered-row">
+      <button type="button" id="clear-discovered-btn" class="clear-discovered-btn"></button>
+    </div>
 
-  <script src="popup.js"></script>
-</body>
+    <div class="actions">
+      <button id="save-btn" class="btn btn-primary"></button>
+      <button id="reset-btn" class="btn btn-secondary"></button>
+    </div>
+    <div id="status" class="status"></div>
+
+    <script src="i18n.js"></script>
+    <script src="popup.js"></script>
+  </body>
 </html>

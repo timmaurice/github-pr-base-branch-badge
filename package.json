@@ -1,0 +1,19 @@
+{
+  "name": "github-pr-base-branch-badge",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Chrome extension — dev tooling only, the extension itself has no build step",
+  "scripts": {
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.7.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.7.0",
+    "prettier": "^3.4.2"
+  }
+}

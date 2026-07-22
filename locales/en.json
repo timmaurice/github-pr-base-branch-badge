@@ -1,0 +1,45 @@
+{
+  "filterButtonLabel": "Target Branch",
+  "filterPopoverTitle": "Filter by target branch",
+  "closeAriaLabel": "Close",
+  "noBranchesDiscovered": "No branches discovered yet.",
+  "filterBranchesPlaceholder": "Filter branches",
+  "badgeTitle": "Filter by target branch: {branch}",
+
+  "tokenOptional": "(optional, for private repos)",
+  "tokenTestBtn": "Test",
+  "tokenTesting": "Testing…",
+  "tokenShowLabel": "Show token",
+  "tokenHideLabel": "Hide token",
+  "tokenHintHtml": "Needed for private repos (api.github.com does not receive github.com session cookies) and for a higher rate limit. A fine-grained token with \"Pull requests: Read-only\" permission is enough. <a href=\"https://github.com/settings/personal-access-tokens/new\" target=\"_blank\" rel=\"noopener\">Create token ↗</a>",
+  "tokenTestNoToken": "No token set — public repos only, limit 60/h{quota}",
+  "tokenTestUnexpected": "Unexpected response without token ({status})",
+  "tokenTestValid": "✓ Token valid — signed in as {login}{quota}",
+  "tokenTestInvalid": "✗ Token invalid or expired (401)",
+  "tokenTestFailed": "✗ Test failed ({status}){quota}",
+  "tokenTestNetworkError": "✗ Network error: {message}",
+  "rateLimitSuffix": " — Rate limit: {remaining}/{limit} remaining",
+
+  "languageLabel": "Language",
+
+  "saveBtn": "💾 Save",
+  "resetBtn": "↻ Reset",
+  "confirmReset": "Reset all branch colors to their defaults? This cannot be undone.",
+  "addBranchBtn": "+ Add branch",
+  "defaultRowLabel": "Default",
+  "defaultRowTitle": "Fallback color for all unconfigured branches",
+  "previewDefaultText": "other",
+  "previewPlaceholder": "branch",
+  "namePlaceholder": "branch-name",
+  "removeBranchTitle": "Remove branch",
+  "removeBranchAriaLabel": "Remove branch \"{name}\"",
+
+  "statusSaved": "✓ Saved!",
+  "statusReset": "✓ Reset!",
+  "errorInvalidColor": "❌ Invalid color! Format: #RRGGBB",
+  "errorDuplicate": "❌ Branch \"{name}\" is duplicated",
+
+  "clearDiscoveredBtn": "Clear discovered branches",
+  "clearDiscoveredConfirm": "Clear all discovered branch names? They will reappear as PRs are re-scanned.",
+  "clearDiscoveredDone": "✓ Cleared!"
+}

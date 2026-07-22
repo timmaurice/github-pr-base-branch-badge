@@ -55,14 +55,14 @@
 
 /* GitHub dark mode class (when using GitHub's dark mode toggle) */
 body.dark .base-branch-badge,
-html[data-color-mode="dark"] .base-branch-badge {
+html[data-color-mode='dark'] .base-branch-badge {
   background-color: #1f2937;
   border-color: #4b5563;
   color: #e5e7eb;
 }
 
 body.dark .base-branch-badge:hover,
-html[data-color-mode="dark"] .base-branch-badge:hover {
+html[data-color-mode='dark'] .base-branch-badge:hover {
   background-color: #374151;
   border-color: #6b7280;
   color: #f3f4f6;

@@ -14,21 +14,18 @@
       "48": "icon48.png",
       "128": "icon128.png"
     },
-    "default_title": "GitHub PR Base Branch Badge - Einstellungen",
+    "default_title": "GitHub PR Base Branch Badge - Settings",
     "default_popup": "popup.html"
   },
-  "permissions": ["scripting", "storage"],
-  "host_permissions": [
-    "https://github.com/*",
-    "https://api.github.com/*"
-  ],
+  "permissions": ["storage"],
+  "host_permissions": ["https://github.com/*", "https://api.github.com/*"],
   "background": {
     "service_worker": "background.js"
   },
   "content_scripts": [
     {
       "matches": ["https://github.com/*"],
-      "js": ["content.js"],
+      "js": ["i18n.js", "content.js"],
       "css": ["styles.css"],
       "run_at": "document_end"
     }
