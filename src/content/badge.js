@@ -173,7 +173,14 @@ function addBaseBranchBadge(prRow, prLink, baseBranch) {
   // Create badge element
   const badge = document.createElement('a');
   badge.className = 'base-branch-badge';
-  badge.innerHTML = `${PULL_REQUEST_ICON_SVG}<span>${baseBranch}</span>`;
+  // PULL_REQUEST_ICON_SVG is a trusted constant, safe as innerHTML — but
+  // baseBranch comes from the GitHub API (an attacker-controlled branch
+  // name: git ref rules block spaces/~^:?*[\ but not <>"'&), so it must be
+  // set via textContent, never concatenated into the same innerHTML string.
+  badge.innerHTML = PULL_REQUEST_ICON_SVG;
+  const branchLabel = document.createElement('span');
+  branchLabel.textContent = baseBranch;
+  badge.appendChild(branchLabel);
   // Clicking a badge selects ONLY this branch (replacing any other
   // selection) — the toolbar dropdown is the tool for multi-select.
   badge.href = `?q=${encodeURIComponent(buildQueryForBaseBranches([baseBranch]))}`;

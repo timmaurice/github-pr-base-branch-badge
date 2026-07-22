@@ -1,102 +1,134 @@
 # GitHub PR Base Branch Badge Extension
 
-Eine Chrome Extension, die den Base Branch (Target Branch) von Pull Requests in der GitHub PR-Listenansicht als farbigen Badge anzeigt und Filterung nach einem oder mehreren Base Branches ermöglicht.
+A Chrome extension that shows the base (target) branch of pull requests in GitHub's PR list view as a colored badge, and lets you filter by one or more base branches.
 
 ## Features
 
-✅ **Base Branch Badge** - Zeigt den Base Branch als farbigen Badge (PR-Icon + Name) neben jeder PR
-✅ **Klick-Filter** - Klick auf einen Badge filtert sofort nach genau diesem Base Branch (Filterzustand open/closed bleibt erhalten)
-✅ **Multi-Select-Dropdown** - "Base Branch ▾" vor dem Author-Filter, analog zu GitHubs "Filter by author": Checkbox-Liste aller bekannten Branches, mehrere gleichzeitig wählbar, zeigt die Anzahl aktiver Filter als Badge am Button
-✅ **Popup-Einstellungen** - Farben pro Branch anpassen, Branches hinzufügen/umbenennen/entfernen
-✅ **Mehrsprachig** - Sprachauswahl (Englisch/Deutsch) im Popup, Standard ist Englisch; wirkt sofort auf Popup und alle offenen GitHub-Tabs
-✅ **Persistentes Caching** - Base Branch (24h TTL) und einmal gesehene Branch-Namen werden in `chrome.storage.local` zwischengespeichert
-✅ **Dark Mode Support** - Automatische Anpassung an das Betriebssystem-Farbschema
-✅ **Turbo-/Infinite-Scroll-fest** - Funktioniert auch bei dynamisch nachgeladenen PRs und beim Wechsel zwischen Issues/Pulls-Tabs ohne vollständigen Seiten-Reload
-✅ **Automatischer Retry** - Vorübergehende Fehler (GitHubs Secondary Rate Limit, Netzwerkfehler) werden beim nächsten Scan (z.B. Scrollen) automatisch neu versucht, statt die Zeile dauerhaft ohne Badge zu lassen
+✅ **Base Branch Badge** - Shows the base branch as a colored badge (PR icon + name) next to each PR
+✅ **Click-to-Filter** - Clicking a badge instantly filters the list by exactly that base branch (open/closed filter state is preserved)
+✅ **Multi-Select Dropdown** - "Base Branch ▾" before the Author filter, mirroring GitHub's own "Filter by author": a checkbox list of all known branches, several selectable at once, shows the number of active filters as a badge on the button
+✅ **Popup Settings** - Customize colors per branch, add/rename/remove branches
+✅ **Multilingual** - Language selector (English/German) in the popup, defaults to English; applies immediately to the popup and all open GitHub tabs
+✅ **Persistent Caching** - Base branch (24h TTL) and once-seen branch names are cached in `chrome.storage.local`
+✅ **Dark Mode Support** - Automatically adapts to the OS color scheme
+✅ **Turbo-/Infinite-Scroll-Proof** - Works even with dynamically loaded-in PRs and when switching between the Issues/Pulls tabs, without a full page reload
+✅ **Automatic Retry** - Transient errors (GitHub's secondary rate limit, network errors) are automatically retried on the next scan (e.g. scrolling) instead of leaving the row without a badge permanently
 
 ## Installation (Unpacked Mode)
 
-1. `chrome://extensions/` öffnen
-2. "Developer mode" oben rechts aktivieren
-3. "Load unpacked" klicken und diesen Ordner auswählen
-4. Zu einer GitHub PR-Liste navigieren (z.B. `github.com/<org>/<repo>/pulls`)
+For normal use, the pre-built release ZIP is all you need — **no Node/npm required**:
 
-## Verwendung
+1. Download the latest release ZIP from the [Releases page](../../releases) (e.g. `github-pr-base-branch-badge-v1.0.0.zip`) and extract it
+2. Open `chrome://extensions/`
+3. Enable "Developer mode" in the top right
+4. Click "Load unpacked" and select the extracted folder
+5. Navigate to a GitHub PR list (e.g. `github.com/<org>/<repo>/pulls`)
 
-1. Neben jeder PR erscheint ein farbiger Badge mit PR-Icon und Branch-Namen
-2. **Klick auf einen Badge** filtert die Liste nach genau diesem Base Branch
-3. **"Base Branch ▾"** öffnet ein Dropdown mit Checkboxen für alle bekannten Branches — mehrere gleichzeitig ankreuzbar, Auswahl wird sofort angewendet; die Zahl am Button zeigt die Anzahl aktiver Filter
-4. **Extension-Icon klicken** öffnet das Einstellungs-Popup: Farben ändern, Branches hinzufügen/umbenennen/entfernen, Token setzen/testen, Sprache umschalten (EN/DE, wirkt sofort), erkannte Branches zurücksetzen, speichern
+Every release ZIP already contains everything built (`manifest.json`, `popup.html`, `dist/`, `locales/`, icons) — identical to what `npm run package` produces locally (see below).
 
-## Architektur
+## Development
+
+Only needed if you're working on the code itself — not for plain use of the extension:
+
+1. `npm install` (once)
+2. `npm run build` — compiles `src/**` into `dist/`, the directory `manifest.json`/`popup.html` reference (doesn't exist before the first build, isn't part of the repo)
+3. Open `chrome://extensions/`, enable "Developer mode", "Load unpacked" → select this folder (not `dist/`) — `manifest.json` lives at the root and references `dist/*` internally
+
+Other scripts:
+
+- `npm run watch` — rebuilds automatically on every change under `src/`
+- `npm run lint` / `npm run format` / `npm test` — ESLint, Prettier, Node's built-in test runner (`node --test`)
+- `npm run package` — builds fresh and produces the release ZIP under `release/` (exactly what the `Release` workflow publishes automatically on a version tag)
+- After changes under `src/content/` or `src/styles/`: rebuild, reload the extension in `chrome://extensions/`, then reload the GitHub tab
+- After changes to `src/popup.js`: rebuild, just reopen the popup (no extension reload needed)
+
+### Creating a release
+
+1. Bump `manifest.json`'s `"version"`, commit
+2. Push a `vX.Y.Z` tag (matching the new version) — `.github/workflows/release.yml` builds, tests, packages, and publishes the ZIP as a GitHub Release automatically
+
+## Usage
+
+1. A colored badge with a PR icon and branch name appears next to every PR
+2. **Clicking a badge** filters the list by exactly that base branch
+3. **"Base Branch ▾"** opens a dropdown with checkboxes for all known branches — several can be checked at once, the selection applies immediately; the number on the button shows the count of active filters
+4. **Clicking the extension icon** opens the settings popup: change colors, add/rename/remove branches, set/test a token, switch language (EN/DE, applies immediately), reset discovered branches, save
+
+## Architecture
 
 ```
-manifest.json    Manifest v3 Konfiguration
-content.js       Content Script — findet PRs, holt Base Branch, fügt Badges/Filter-Dropdown ein
-background.js    Service Worker — verwaltet den persistenten 24h-Cache für Base-Branch-Lookups und lädt locales/*.json (content.js darf das nicht selbst per fetch(), siehe unten)
-popup.html/js    Einstellungs-Popup (Branch-Farben, Token, Sprache verwalten)
-i18n.js          Fragt per chrome.runtime.sendMessage einen Sprach-Dict bei background.js an, cacht ihn im Speicher und interpoliert {platzhalter}-Tokens; genutzt von content.js und popup.js
-locales/*.json   EN/DE-Sprachdateien (ein JSON pro Sprache) — neue Sprache: Datei mit denselben Keys anlegen, in background.js' LOCALE_FILES registrieren, Option in popup.html ergänzen
-styles.css       Basis-Styles für den Content-Script-Kontext
-icon*.png/svg    Extension-Icon (icon.svg ist die Vektor-Quelle für die PNGs, wird von Chrome selbst nicht geladen)
+manifest.json          Manifest v3 config — references dist/content.js, dist/background.js, dist/styles.css
+popup.html             Settings popup markup — references dist/popup.js
+src/content/           Content script source (ES modules) — index.js is the entry point; badge.js, filterDropdown.js,
+                       query.js, state.js, storageCache.js, settings.js, utils.js each a module per concern
+src/background.js      Service worker source — manages the persistent 24h cache for base-branch lookups and loads
+                       locales/*.json (the content script isn't allowed to fetch that itself, see below)
+src/popup.js           Popup logic source (manage branch colors, token, language)
+src/shared/i18n.js     Requests a locale dict from background.js via chrome.runtime.sendMessage, caches it in memory,
+                       and interpolates {placeholder} tokens; compiled into both bundles (content/popup)
+src/styles/            SCSS sources (index.scss + partials), compiled into dist/styles.css
+locales/*.json         EN/DE language files (one JSON per language) — new language: add a file with the same keys,
+                       register it in src/background.js's LOCALE_FILES, add an option in popup.html
+icon*.png/svg          Extension icon (icon.svg is the vector source for the PNGs, never loaded by Chrome itself)
+dist/                  Generated by `npm run build` (esbuild + sass) — not part of the repo, don't hand-edit
 ```
 
-### Wie der Base Branch ermittelt wird
+### How the base branch is resolved
 
-`content.js` ruft für jede neu gesichtete PR `GET https://api.github.com/repos/{owner}/{repo}/pulls/{number}` auf und liest `base.ref` direkt aus der JSON-Antwort — kein HTML-Scraping mehr. Das Ergebnis wird danach zweistufig gecacht:
+`content.js` calls `GET https://api.github.com/repos/{owner}/{repo}/pulls/{number}` for every newly seen PR and reads `base.ref` directly from the JSON response — no more HTML scraping. The result is then cached in two tiers:
 
-1. In-Memory (`branchCache`, pro Seitenaufruf)
-2. Persistent über `background.js` in `chrome.storage.local` (24h TTL)
+1. In-memory (`branchCache`, per page load)
+2. Persistent via `background.js` in `chrome.storage.local` (24h TTL)
 
-**Wichtig:** `api.github.com` ist eine andere Origin als `github.com` und erhält daher **nicht** automatisch die Session-Cookies des eingeloggten Browsers. Für private Repos (und für ein höheres Rate-Limit) muss im Popup ein GitHub Personal Access Token hinterlegt werden — ein Fine-grained Token mit Berechtigung "Pull requests: Read-only" genügt. Ohne Token funktioniert die Extension nur für öffentliche Repos und ist auf 60 Requests/Stunde limitiert (mit Token: 5000/Stunde).
+**Important:** `api.github.com` is a different origin than `github.com` and therefore does **not** automatically receive the logged-in browser's session cookies. For private repos (and for a higher rate limit), a GitHub Personal Access Token must be set in the popup — a fine-grained token with "Pull requests: Read-only" permission is enough. Without a token, the extension only works for public repos and is limited to 60 requests/hour (with a token: 5000/hour).
 
-Zusätzlich merkt sich `content.js` jeden einmal gesehenen Branch-Namen dauerhaft in `chrome.storage.local` (`discoveredBranches`), damit auch Branches ohne konfigurierte Farbe im Filter-Dropdown auftauchen — auch nachdem sie durch einen Filter aus der aktuellen Ansicht verschwunden sind. Dieses Set wächst nur; "Erkannte Branches zurücksetzen" im Popup leert es wieder (Branches tauchen dann erst wieder auf, sobald ihre PRs neu gescannt werden).
+`content.js` additionally remembers every branch name it has ever seen persistently in `chrome.storage.local` (`discoveredBranches`), so that branches without a configured color also show up in the filter dropdown — even after they've disappeared from the current (filtered) view. This set only grows; "Reset discovered branches" in the popup clears it again (branches then reappear only once their PRs are rescanned).
 
-Fehlschläge beim PR-Lookup werden nach Fehlerart behandelt: GitHubs Secondary Rate Limit und Netzwerkfehler gelten als vorübergehend — die betroffene Zeile wird aus `processedPRs` entfernt und beim nächsten `setupPRBadges()`-Durchlauf (z.B. durch Scrollen) automatisch erneut versucht. Dauerhafte Fehler (404 ohne/mit falschem Token, Primary Rate Limit) werden dagegen wie bisher nur geloggt, da ein Retry ohne Nutzeraktion (Token setzen, warten) nichts ändern würde.
+Failed PR lookups are handled by error type: GitHub's secondary rate limit and network errors are treated as transient — the affected row is removed from `processedPRs` and automatically retried on the next `setupPRBadges()` pass (e.g. triggered by scrolling). Permanent errors (404 without/with a wrong token, primary rate limit), on the other hand, are still just logged as before, since retrying without user action (setting a token, waiting) wouldn't change anything.
 
-### Branch-Farben
+### Branch colors
 
-`popup.js` verwaltet einen Farb-Map (`branchColors`) in `chrome.storage.local`. Branch-Namen sind frei wählbar (Rename/Hinzufügen/Entfernen im Popup) — `content.js` sucht die Farbe generisch per Branch-Namen und fällt auf die "Standard"-Farbe zurück, falls kein Eintrag existiert. Nach dem Speichern sendet das Popup ein `reloadBadges`-Signal an alle offenen GitHub-Tabs, woraufhin bestehende Badges entfernt und mit den neuen Farben neu gezeichnet werden (aus dem In-Memory-Cache, ohne erneuten Netzwerk-Request).
+`popup.js` manages a color map (`branchColors`) in `chrome.storage.local`. Branch names are freely chosen (rename/add/remove in the popup) — `content.js` looks up the color generically by branch name and falls back to the "default" color if no entry exists. After saving, the popup sends a `reloadBadges` signal to all open GitHub tabs, which removes existing badges and redraws them with the new colors (from the in-memory cache, without a new network request).
 
-### Mehrfachauswahl im Filter
+### Multi-selection in the filter
 
-GitHub behandelt wiederholte `base:`-Qualifier in der Suche als OR, nicht als AND — `base:master base:beta` matcht PRs mit Base `master` **oder** `beta`. Die Query-Bauhelfer in `content.js` (`getSelectedBaseBranches`, `buildQueryForBaseBranches`, `navigateToQuery`) nutzen genau dieses Verhalten; ein Klick auf einen Badge setzt dagegen bewusst nur genau einen Branch (ersetzt die aktuelle Auswahl), das Dropdown ist der Weg für Mehrfachauswahl.
+GitHub treats repeated `base:` qualifiers in search as OR, not AND — `base:master base:beta` matches PRs with base `master` **or** `beta`. The query helpers in `src/content/query.js` (`getSelectedBaseBranches`, `buildQueryForBaseBranches`, `navigateToQuery`) rely on exactly this behavior; clicking a badge, by contrast, deliberately sets just a single branch (replacing the current selection) — the dropdown is the way to select multiple.
 
-### Navigation zwischen Issues und Pulls
+### Navigation between Issues and Pulls
 
-GitHub nutzt Turbo (Hotwire) für die Navigation zwischen `/issues` und `/pulls` — die URL ändert sich über die History API ohne echten Seiten-Reload. Damit die Badges/das Dropdown trotzdem zuverlässig erscheinen:
+GitHub uses Turbo (Hotwire) for navigation between `/issues` and `/pulls` — the URL changes via the History API without a real page reload. For the badges/dropdown to still appear reliably:
 
-- Das Manifest matched pauschal `https://github.com/*` statt nur `*/pulls*`/`*/issues*` — PR-Detailseiten (`/pull/<n>`, Singular) sind ein eigenes Muster, und wer zuerst dort landet (oder per Turbo Liste → Detail → Liste navigiert), darf nicht ohne injiziertes Script dastehen. `content.js` selbst entscheidet per `isPRListPage()`, wo tatsächlich etwas passiert.
-- `content.js` reagiert auf das `turbo:load`-Event und hängt den `MutationObserver` bei jeder Navigation neu an das aktuelle `document.body` — GitHub tauscht dieses Element bei manchen Navigationen komplett aus, wodurch ein alter Observer sonst den Anschluss verliert.
-- Änderungen an der Filterauswahl (Checkbox, Badge-Klick) lösen dagegen einen echten Seiten-Reload aus (bestätigt durch Beobachtung), nicht nur eine Turbo-Soft-Navigation.
+- The manifest matches `https://github.com/*` broadly instead of just `*/pulls*`/`*/issues*` — PR detail pages (`/pull/<n>`, singular) are a distinct pattern, and whoever lands there first (or navigates list → detail → list via Turbo) must not be left without the injected script. `content.js` itself decides, via `isPRListPage()`, where anything actually happens.
+- `content.js` reacts to the `turbo:load` event and re-attaches the `MutationObserver` to the current `document.body` on every navigation — GitHub sometimes replaces this element wholesale on certain navigations, which would otherwise disconnect an old observer.
+- Changes to the filter selection (checkbox, badge click), on the other hand, trigger a real page reload (confirmed by observation), not just a Turbo soft navigation.
 
 ## Troubleshooting
 
-**Badge wird nicht angezeigt?**
+**Badge not showing up?**
 
-- Seite neu laden (F5)
-- Extension in `chrome://extensions/` auf Fehler prüfen
-- Browser-Konsole (F12) auf `Base Branch Badge:`-Warnungen prüfen — ein `404` bei privaten Repos ohne Token bedeutet: Token fehlt; ein `403` bedeutet: Rate-Limit erreicht, ein Token (oder ein anderes Token mit höherem Limit) hinzufügen
+- Reload the page (F5)
+- Check the extension in `chrome://extensions/` for errors
+- Check the browser console (F12) for `Base Branch Badge:` warnings — a `404` on private repos without a token means: token missing; a `403` means: rate limit reached, add a token (or a different token with a higher limit)
 
-**404 trotz gesetztem Token bei einem Organisations-Repo?**
+**404 despite a set token, on an organization repo?**
 
-- Fine-grained Tokens mit "All repositories" gelten nur für Repos, die einem persönlich gehören — Repos einer Organisation (z.B. `hafele-group-it`) sind davon ausgenommen, bis die Organisation Fine-grained-Token-Zugriff explizit erlaubt/genehmigt hat (Org-Settings → Personal access tokens)
-- Schnellerer Workaround: ein **Classic Token** mit Scope `repo` erstellen (`github.com/settings/tokens` → "Generate new token (classic)") — braucht keine Org-Genehmigung, außer die Organisation erzwingt SSO (dann Token einmalig per "Enable SSO" für die Org autorisieren)
+- Fine-grained tokens with "All repositories" only apply to repos personally owned — repos belonging to an organization (e.g. `hafele-group-it`) are excluded from that until the organization has explicitly allowed/approved fine-grained token access (org settings → Personal access tokens)
+- Faster workaround: create a **classic token** with the `repo` scope (`github.com/settings/tokens` → "Generate new token (classic)") — doesn't need org approval, unless the organization enforces SSO (then authorize the token once via "Enable SSO" for the org)
 
-**Popup öffnet sich nicht?**
+**Popup doesn't open?**
 
-- Extension-Icon in der Toolbar anpinnen (Puzzle-Symbol 🧩 → Pin)
-- Alternativ: `chrome://extensions/` → Details → "Erweiterungsoptionen" existiert nicht mehr, Einstellungen laufen ausschließlich über das Popup
+- Pin the extension icon in the toolbar (puzzle icon 🧩 → Pin)
+- Alternatively: `chrome://extensions/` → Details → "Extension options" no longer exists, settings run exclusively through the popup
 
-**Ein Branch fehlt im Filter-Dropdown?**
+**A branch is missing from the filter dropdown?**
 
-- Er muss mindestens einmal als Badge sichtbar gewesen sein (oder in den Popup-Farbeinstellungen konfiguriert sein), damit er in `discoveredBranches` landet
+- It must have been visible as a badge at least once (or be configured in the popup's color settings) for it to land in `discoveredBranches`
 
-## Bekannte Grenzen
+## Known Limitations
 
-- Jede neu gesichtete PR verursacht einen zusätzlichen API-Request, um den Base Branch zu ermitteln (durch Caching nur beim ersten Mal pro PR)
-- Ohne hinterlegten Token: nur öffentliche Repos, 60 API-Requests/Stunde (geteilt über alle Extensions/Tools, die unauthentifiziert auf die GitHub-API zugreifen)
-- Branch-Namen-Abgleich ist case-sensitive und muss exakt dem GitHub-Namen entsprechen
-- `discoveredBranches` wächst nur (keine automatische Bereinigung) — gelöschte/umbenannte Branches bleiben im Filter-Dropdown sichtbar, bis "Erkannte Branches zurücksetzen" im Popup manuell ausgelöst wird
-- Sprachauswahl (EN/DE) deckt nur die von der Extension selbst gerenderten Texte ab (Badges, Filter-Dropdown, Popup) — nicht GitHubs eigene Oberfläche
-- Nur `github.com`, kein GitHub Enterprise Server (eigene Domain) — `manifest.json` müsste dafür um die entsprechende Domain erweitert werden
+- Every newly seen PR causes an extra API request to determine the base branch (only once per PR thanks to caching)
+- Without a token set: public repos only, 60 API requests/hour (shared across all extensions/tools that access the GitHub API unauthenticated)
+- Branch name matching is case-sensitive and must exactly match GitHub's name
+- `discoveredBranches` only grows (no automatic cleanup) — deleted/renamed branches remain visible in the filter dropdown until "Reset discovered branches" is manually triggered in the popup
+- Language selection (EN/DE) only covers text rendered by the extension itself (badges, filter dropdown, popup) — not GitHub's own interface
+- `github.com` only, no GitHub Enterprise Server (own domain) — `manifest.json` would need to be extended with the corresponding domain for that

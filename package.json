@@ -3,10 +3,14 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Chrome extension — source lives in src/, esbuild bundles it to the root-level content.js/background.js/popup.js that manifest.json/popup.html reference",
+  "description": "Chrome extension — source lives in src/, esbuild + sass bundle it into the gitignored dist/ that manifest.json/popup.html reference",
+  "engines": {
+    "node": "^20.19.0 || ^22.13.0 || >=24"
+  },
   "scripts": {
     "build": "node scripts/build.mjs",
     "watch": "node scripts/build.mjs --watch",
+    "package": "node scripts/package.mjs",
     "test": "node --test",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
