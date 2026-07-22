@@ -1,10 +1,10 @@
 import { I18N_DEFAULT_LANG, i18nReady, i18nText } from './shared/i18n.js';
 
 const DEFAULT_COLORS = {
-  qas: '#3b82f6',
-  int: '#f97316',
   main: '#10b981',
-  preprod: '#ef4444',
+  develop: '#f97316',
+  staging: '#3b82f6',
+  'release/*': '#ef4444',
   default: '#6b7280'
 };
 
@@ -157,9 +157,8 @@ function renderRows(colors) {
   const entries = Object.entries(colors).filter(([name]) => name !== 'default');
   const defaultColor = colors.default || DEFAULT_COLORS.default;
 
-  entries.forEach(([name, color], i) => {
-    if (i > 0) list.appendChild(divider());
-    list.append(...buildRow(name, color, false));
+  entries.forEach(([name, color]) => {
+    list.appendChild(buildRow(name, color, false));
   });
 
   const addBtn = document.createElement('button');
@@ -169,16 +168,31 @@ function renderRows(colors) {
   addBtn.addEventListener('click', addBranchRow);
   list.appendChild(addBtn);
 
-  list.appendChild(divider());
-  list.append(...buildRow('default', defaultColor, true));
+  list.appendChild(buildRow('default', defaultColor, true));
 
   validateAllNameFields();
 }
 
-function divider() {
-  const el = document.createElement('div');
-  el.className = 'row-divider';
-  return el;
+// The row currently being dragged, set on dragstart and read by every other
+// row's dragover/drop handler — there's only ever one drag in flight in
+// this popup, so a module-level ref is simpler than threading it through
+// dataTransfer (which can't carry a live DOM reference anyway).
+let draggedRow = null;
+
+function clearDropIndicators() {
+  list.querySelectorAll('.drop-indicator-before, .drop-indicator-after').forEach((el) => {
+    el.classList.remove('drop-indicator-before', 'drop-indicator-after');
+  });
+}
+
+// Moves `draggedRowEl` next to `targetRowEl` (before/after per `before`).
+// Each row is now a single wrapper element (see buildRow), so this is a
+// plain DOM move — no index bookkeeping or rebuilding through the
+// branchColors object needed (which would require unique keys and could
+// silently collapse rows sharing a duplicate/empty name while mid-edit).
+function moveRowTo(draggedRowEl, targetRowEl, before) {
+  if (draggedRowEl === targetRowEl) return;
+  list.insertBefore(draggedRowEl, before ? targetRowEl : targetRowEl.nextSibling);
 }
 
 // Flags empty or duplicate branch names as the user types, so mistakes
@@ -200,18 +214,52 @@ function validateAllNameFields() {
 }
 
 function buildRow(name, color, isDefault) {
+  const rowEl = document.createElement('div');
+  rowEl.className = isDefault ? 'branch-row branch-row--default' : 'branch-row';
+
+  // Priority among matching wildcard patterns is the row order (top wins,
+  // see resolveBranchColor() in src/content/utils.js) — this handle is how
+  // the user controls that order, via native HTML5 drag-and-drop. It's a
+  // dedicated grab point (rather than the row as a whole) so that starting
+  // a drag from the name/color inputs doesn't fight with text selection.
+  const dragHandle = document.createElement('span');
+  dragHandle.className = 'drag-handle';
+  dragHandle.textContent = '⠿';
+
   let nameEl;
   if (isDefault) {
     nameEl = document.createElement('span');
     nameEl.className = 'branch-name';
     nameEl.textContent = t('defaultRowLabel');
     nameEl.title = t('defaultRowTitle');
+    dragHandle.style.visibility = 'hidden';
   } else {
     nameEl = document.createElement('input');
     nameEl.type = 'text';
     nameEl.className = 'branch-name-input';
     nameEl.value = name;
     nameEl.placeholder = t('namePlaceholder');
+    nameEl.title = t('namePatternHint');
+
+    dragHandle.draggable = true;
+    dragHandle.title = t('dragHandleTitle');
+    dragHandle.setAttribute('aria-label', t('dragHandleAriaLabel'));
+
+    dragHandle.addEventListener('dragstart', (e) => {
+      draggedRow = rowEl;
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', '');
+      // Drag the whole row as the ghost image, not just this small handle.
+      const rect = rowEl.getBoundingClientRect();
+      e.dataTransfer.setDragImage(rowEl, e.clientX - rect.left, e.clientY - rect.top);
+      rowEl.classList.add('dragging');
+    });
+
+    dragHandle.addEventListener('dragend', () => {
+      rowEl.classList.remove('dragging');
+      clearDropIndicators();
+      draggedRow = null;
+    });
   }
 
   const swatchWrapper = document.createElement('div');
@@ -276,19 +324,37 @@ function buildRow(name, color, isDefault) {
     removeBtn.title = t('removeBranchTitle');
     removeBtn.setAttribute('aria-label', t('removeBranchAriaLabel', { name }));
     removeBtn.addEventListener('click', () => {
-      const rowEls = [nameEl, swatchWrapper, hex, preview, removeBtn];
-      const idx = Array.from(list.children).indexOf(nameEl);
-      // Remove the row and an adjacent divider
-      const prevDivider = list.children[idx - 1];
-      if (prevDivider && prevDivider.classList.contains('row-divider')) {
-        prevDivider.remove();
-      }
-      rowEls.forEach((el) => el.remove());
+      rowEl.remove();
       validateAllNameFields();
     });
   }
 
-  return [nameEl, swatchWrapper, hex, preview, removeBtn];
+  rowEl.append(dragHandle, nameEl, swatchWrapper, hex, preview, removeBtn);
+
+  if (!isDefault) {
+    rowEl.addEventListener('dragenter', (e) => e.preventDefault());
+
+    rowEl.addEventListener('dragover', (e) => {
+      if (!draggedRow || draggedRow === rowEl) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      const rect = rowEl.getBoundingClientRect();
+      const before = e.clientY < rect.top + rect.height / 2;
+      clearDropIndicators();
+      rowEl.classList.add(before ? 'drop-indicator-before' : 'drop-indicator-after');
+    });
+
+    rowEl.addEventListener('drop', (e) => {
+      if (!draggedRow || draggedRow === rowEl) return;
+      e.preventDefault();
+      const rect = rowEl.getBoundingClientRect();
+      const before = e.clientY < rect.top + rect.height / 2;
+      moveRowTo(draggedRow, rowEl, before);
+      clearDropIndicators();
+    });
+  }
+
+  return rowEl;
 }
 
 function addBranchRow() {
@@ -296,45 +362,40 @@ function addBranchRow() {
   const color = NEW_BRANCH_PALETTE[paletteIndex % NEW_BRANCH_PALETTE.length];
   paletteIndex++;
 
-  const dividerEl = divider();
-  list.insertBefore(dividerEl, addBtn);
-  buildRow('', color, false).forEach((el) => list.insertBefore(el, addBtn));
+  const row = buildRow('', color, false);
+  list.insertBefore(row, addBtn);
 
-  const newNameInput = dividerEl.nextSibling;
-  if (newNameInput && newNameInput.focus) newNameInput.focus();
+  const newNameInput = row.querySelector('.branch-name-input');
+  if (newNameInput) newNameInput.focus();
 
   validateAllNameFields();
 }
 
 function saveSettings() {
   const colors = {};
-  const rows = Array.from(list.children).filter(
-    (el) => !el.classList.contains('row-divider') && !el.classList.contains('add-branch-btn')
-  );
+  const rows = Array.from(list.querySelectorAll('.branch-row'));
 
   const seenNames = new Set();
   let hasError = false;
 
-  for (let i = 0; i < rows.length; i += 5) {
-    const nameEl = rows[i];
-    const hexEl = rows[i + 2];
-    const isDefault = nameEl.tagName === 'SPAN';
+  rows.forEach((row) => {
+    const isDefault = row.classList.contains('branch-row--default');
+    const nameEl = row.querySelector(isDefault ? '.branch-name' : '.branch-name-input');
+    const hexEl = row.querySelector('.color-text');
     const key = isDefault ? 'default' : nameEl.value.trim();
 
     if (!isDefault) {
-      if (!key) {
-        continue;
-      }
+      if (!key) return;
       if (seenNames.has(key)) {
         showStatus(t('errorDuplicate', { name: key }), 'error');
         hasError = true;
-        continue;
+        return;
       }
       seenNames.add(key);
     }
 
     colors[key] = hexEl.value.trim();
-  }
+  });
 
   if (hasError) return;
 

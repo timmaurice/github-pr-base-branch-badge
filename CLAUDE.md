@@ -31,6 +31,7 @@ A Chrome Manifest V3 extension that shows the base (target) branch of each PR in
 - **`locales/en.json`**, **`locales/de.json`** — one flat key→string JSON file per language. Add a language by adding a file here (same keys), registering it in `src/background.js`'s `LOCALE_FILES` map, and adding an `<option>` in `popup.html`.
 - **`scripts/build.mjs`** — the esbuild + sass driver (object-form `entryPoints` so each JS entry maps to a specific output basename in `dist/`; a plain recursive `fs.watch` on `src/styles/` drives CSS rebuilds in `--watch` mode — since sass's JS API has no built-in watch mode, and watching only `index.scss` itself would miss edits to the partials it `@use`s). Run via `npm run build`/`npm run watch`, not meant to be imported.
 - **`scripts/package.mjs`** (`npm run package`) — rebuilds, then stages exactly what a "Load unpacked" install needs (`manifest.json`, `popup.html`, `dist/`, `locales/`, the three PNG icons — no `src/`, no tooling configs, no `icon.svg`) into a zip under the gitignored `release/`. `.github/workflows/release.yml` runs this on every `v*` tag push (after verifying the tag matches `manifest.json`'s `version`) and publishes the zip as a GitHub Release — the point being that end users installing the extension never need Node/npm at all, only contributors editing `src/` do.
+- **`icon16.png`/`icon48.png`/`icon128.png`/`icon.svg`** — extension icons referenced by `manifest.json`; `icon.svg` is the vector source for the three PNGs and is never itself loaded by Chrome, which is why `scripts/package.mjs` leaves it out of the release zip.
 
 ### How the base branch is resolved
 
@@ -41,6 +42,8 @@ A Chrome Manifest V3 extension that shows the base (target) branch of each PR in
 PR row fetches are deliberately sequential (`await` in a `for` loop in `setupPRBadges`, `src/content/badge.js`), not parallelized — parallel requests reliably tripped GitHub's secondary/abuse rate limit even with unused primary quota remaining. Don't change this to `Promise.all` without re-testing against real rate limits.
 
 Every branch name ever seen in a badge is persisted to `chrome.storage.local` as `discoveredBranches`, independent of the color map, so the filter dropdown can offer branches that have no configured color and even ones that have scrolled out of the current (filtered) view. This set only grows — nothing prunes it.
+
+Failed PR lookups are handled by error type: GitHub's secondary rate limit and network errors are treated as transient — the affected row is removed from `processedPRs` and automatically retried on the next `setupPRBadges()` pass (e.g. triggered by scrolling). Permanent errors (404 without/with a wrong token, primary rate limit), on the other hand, are still just logged as before, since retrying without user action (setting a token, waiting) wouldn't change anything.
 
 ### Branch colors
 

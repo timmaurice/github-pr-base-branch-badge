@@ -2,6 +2,8 @@
 
 A Chrome extension that shows the base (target) branch of pull requests in GitHub's PR list view as a colored badge, and lets you filter by one or more base branches.
 
+![PR list with color-coded base branch badges next to each pull request, plus the "Target Branch" filter button in the toolbar](screenshots/pr-list-badges.png)
+
 ## Features
 
 - ✅ **Base Branch Badge** - Shows the base branch as a colored badge (PR icon + name) next to each PR
@@ -31,31 +33,55 @@ No Node/npm required — just download and load the extension:
 3. **"Base Branch ▾"** opens a dropdown with checkboxes for all known branches — several can be checked at once, the selection applies immediately; the number on the button shows the count of active filters
 4. **Clicking the extension icon** opens the settings popup: change colors, add/rename/remove branches, set/test a token, switch language (EN/DE, applies immediately), reset discovered branches, save
 
+![The "Filter by target branch" dropdown open, with a checkbox and color dot per known branch](screenshots/filter-dropdown.png)
+
+### Default branch colors
+
+Out of the box, the popup ships with four example entries — `main`, `develop`, `staging`, and a `release/*` wildcard (matching `release/1.0`, `release/my-feature`, ...) — plus the `default` fallback color for everything else. These are just a starting point: add, rename, or remove entries in the popup to match your own repo's branches.
+
+![The settings popup, listing branch entries (develop, feat/*, main, release/*) each with a drag handle, color swatch, hex input and live preview, plus the Default fallback row and Save/Reset buttons](screenshots/popup-settings.png)
+
+### Wildcard patterns and priority
+
+A branch entry's name can be a `*`-wildcard pattern instead of an exact name (e.g. `release/*` matches `release/1.0`, `release/2.0`, ...) — handy for repos with many similarly-named branches instead of adding one entry per branch. An exact name always wins over a pattern; if several patterns match the same branch, the **topmost** one in the popup wins. Drag a row by its grip handle (⠿) to reorder it and change its priority.
+
 ### Using it on private repos / raising the rate limit
 
 By default the extension works unauthenticated on public repos (60 API requests/hour, shared browser-wide). For private repos, or a higher limit (5000/hour), set a GitHub Personal Access Token in the popup — a fine-grained token with "Pull requests: Read-only" is enough. If a repo belongs to an organization and you get a 404 despite a set token, either get the org to approve fine-grained tokens, or use a classic token with the `repo` scope instead (see Troubleshooting below).
 
 ## Troubleshooting
 
-**Badge not showing up?**
+<details>
+<summary>Badge not showing up?</summary>
 
 - Reload the page (F5)
 - Check the extension in `chrome://extensions/` for errors
 - Check the browser console (F12) for `Base Branch Badge:` warnings — a `404` on private repos without a token means: token missing; a `403` means: rate limit reached, add a token (or a different token with a higher limit)
 
-**404 despite a set token, on an organization repo?**
+</details>
+
+<details>
+<summary>404 despite a set token, on an organization repo?</summary>
 
 - Fine-grained tokens with "All repositories" only apply to repos personally owned — repos belonging to an organization (e.g. `hafele-group-it`) are excluded from that until the organization has explicitly allowed/approved fine-grained token access (org settings → Personal access tokens)
 - Faster workaround: create a **classic token** with the `repo` scope (`github.com/settings/tokens` → "Generate new token (classic)") — doesn't need org approval, unless the organization enforces SSO (then authorize the token once via "Enable SSO" for the org)
 
-**Popup doesn't open?**
+</details>
+
+<details>
+<summary>Popup doesn't open?</summary>
 
 - Pin the extension icon in the toolbar (puzzle icon 🧩 → Pin)
 - Alternatively: `chrome://extensions/` → Details → "Extension options" no longer exists, settings run exclusively through the popup
 
-**A branch is missing from the filter dropdown?**
+</details>
+
+<details>
+<summary>A branch is missing from the filter dropdown?</summary>
 
 - It must have been visible as a badge at least once (or be configured in the popup's color settings) for it to land in `discoveredBranches`
+
+</details>
 
 ## Known Limitations
 
@@ -90,41 +116,13 @@ Other scripts:
 1. Bump `manifest.json`'s `"version"`, commit
 2. Push a `vX.Y.Z` tag (matching the new version) — `.github/workflows/release.yml` builds, tests, packages, and publishes the ZIP as a GitHub Release automatically
 
-### Architecture
-
-```
-manifest.json          Manifest v3 config — references dist/content.js, dist/background.js, dist/styles.css
-popup.html             Settings popup markup — references dist/popup.js
-src/content/           Content script source (ES modules) — index.js is the entry point; badge.js, filterDropdown.js,
-                       query.js, state.js, storageCache.js, settings.js, utils.js each a module per concern
-src/background.js      Service worker source — manages the persistent 24h cache for base-branch lookups and loads
-                       locales/*.json (the content script isn't allowed to fetch that itself, see below)
-src/popup.js           Popup logic source (manage branch colors, token, language)
-src/shared/i18n.js     Requests a locale dict from background.js via chrome.runtime.sendMessage, caches it in memory,
-                       and interpolates {placeholder} tokens; compiled into both bundles (content/popup)
-src/styles/            SCSS sources (index.scss + partials), compiled into dist/styles.css
-locales/*.json         EN/DE language files (one JSON per language) — new language: add a file with the same keys,
-                       register it in src/background.js's LOCALE_FILES, add an option in popup.html
-icon*.png/svg          Extension icon (icon.svg is the vector source for the PNGs, never loaded by Chrome itself)
-dist/                  Generated by `npm run build` (esbuild + sass) — not part of the repo, don't hand-edit
-```
-
-### How the base branch is resolved
-
-`content.js` calls `GET https://api.github.com/repos/{owner}/{repo}/pulls/{number}` for every newly seen PR and reads `base.ref` directly from the JSON response — no more HTML scraping. The result is then cached in two tiers:
-
-1. In-memory (`branchCache`, per page load)
-2. Persistent via `background.js` in `chrome.storage.local` (24h TTL)
-
-**Important:** `api.github.com` is a different origin than `github.com` and therefore does **not** automatically receive the logged-in browser's session cookies. For private repos (and for a higher rate limit), a GitHub Personal Access Token must be set in the popup — a fine-grained token with "Pull requests: Read-only" permission is enough. Without a token, the extension only works for public repos and is limited to 60 requests/hour (with a token: 5000/hour).
-
-`content.js` additionally remembers every branch name it has ever seen persistently in `chrome.storage.local` (`discoveredBranches`), so that branches without a configured color also show up in the filter dropdown — even after they've disappeared from the current (filtered) view. This set only grows; "Reset discovered branches" in the popup clears it again (branches then reappear only once their PRs are rescanned).
-
-Failed PR lookups are handled by error type: GitHub's secondary rate limit and network errors are treated as transient — the affected row is removed from `processedPRs` and automatically retried on the next `setupPRBadges()` pass (e.g. triggered by scrolling). Permanent errors (404 without/with a wrong token, primary rate limit), on the other hand, are still just logged as before, since retrying without user action (setting a token, waiting) wouldn't change anything.
-
 ### Branch colors
 
 `popup.js` manages a color map (`branchColors`) in `chrome.storage.local`. Branch names are freely chosen (rename/add/remove in the popup) — `content.js` looks up the color generically by branch name and falls back to the "default" color if no entry exists. After saving, the popup sends a `reloadBadges` signal to all open GitHub tabs, which removes existing badges and redraws them with the new colors (from the in-memory cache, without a new network request).
+
+A key may also be a `*`-wildcard pattern (e.g. `release/*`, `*-staging`) instead of an exact branch name. `resolveBranchColor()` in `src/content/utils.js` (used by both the badge and the filter dropdown's color dot) checks for an exact match first, then the wildcard patterns in `branchColors`' insertion order — i.e. the popup's row order, top to bottom — and only then falls back to `default`.
+
+Each row in the popup (`buildRow()` in `src/popup.js`) is one `.branch-row` element (a small CSS Grid: handle, name, swatch, hex, preview, remove), which is what makes native HTML5 drag-and-drop reordering possible — dragged by the grip handle (⠿) at the start of the row rather than the row as a whole, so starting a drag doesn't fight with text selection in the name/hex inputs. `dragstart` calls `dataTransfer.setDragImage(rowEl, ...)` so the whole row (not just the small handle) follows the cursor, and `dragover` shows a thin insertion-line indicator (`.drop-indicator-before`/`-after`, an inset `box-shadow` so it doesn't shift row height) at whichever edge of the hovered row the cursor is closer to. `moveRowTo()` then does a plain `insertBefore()` of the dragged row's element on drop — no index bookkeeping or rebuilding through the `branchColors` object needed, which would require unique keys and could silently collapse rows sharing a duplicate/empty name while mid-edit.
 
 ### Multi-selection in the filter
 

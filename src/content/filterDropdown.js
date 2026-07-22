@@ -1,7 +1,7 @@
 import { i18nText } from '../shared/i18n.js';
 import { uiLanguage, branchColors, discoveredBranches } from './state.js';
 import { getSelectedBaseBranches, buildQueryForBaseBranches, navigateToQuery } from './query.js';
-import { isPRListPage, isDarkMode } from './utils.js';
+import { isPRListPage, isDarkMode, resolveBranchColor } from './utils.js';
 
 // Adds a "Base Branch ▾" dropdown before the Author button, offering a
 // checkbox per known branch — mirrors GitHub's own "Filter by author"
@@ -138,7 +138,7 @@ function buildBranchRow(branch, selected) {
   dot.className = 'base-branch-filter-dot';
   // Per-branch color, genuinely different per row — not theme-derived, so
   // it can't be hoisted to the wrapper like the other custom properties.
-  dot.style.backgroundColor = branchColors[branch] || branchColors.default;
+  dot.style.backgroundColor = resolveBranchColor(branchColors, branch);
 
   const label = document.createElement('span');
   label.className = 'base-branch-filter-label';

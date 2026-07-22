@@ -10,7 +10,7 @@ import {
 } from './state.js';
 import { getCachedBranch, setCachedBranch } from './storageCache.js';
 import { buildQueryForBaseBranches } from './query.js';
-import { adjustColor } from './utils.js';
+import { adjustColor, resolveBranchColor } from './utils.js';
 
 // Fetch PR details and add base branch badge. Sequential on purpose — firing
 // one request per row in parallel (a PR list page easily has 25+) reliably
@@ -167,8 +167,8 @@ function addBaseBranchBadge(prRow, prLink, baseBranch) {
 
   rememberDiscoveredBranch(baseBranch);
 
-  // Get color for this branch
-  const bgColor = branchColors[baseBranch] || branchColors.default;
+  // Get color for this branch (exact name, then `*`-wildcard patterns, then default)
+  const bgColor = resolveBranchColor(branchColors, baseBranch);
 
   // Create badge element
   const badge = document.createElement('a');

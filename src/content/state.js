@@ -9,10 +9,10 @@ export const discoveredBranches = new Set();
 
 // Default colors
 export const DEFAULT_COLORS = {
-  qas: '#3b82f6',
-  int: '#f97316',
   main: '#10b981',
-  preprod: '#ef4444',
+  develop: '#f97316',
+  staging: '#3b82f6',
+  'release/*': '#ef4444',
   default: '#6b7280'
 };
 

@@ -31,6 +31,9 @@
   "previewDefaultText": "other",
   "previewPlaceholder": "branch",
   "namePlaceholder": "branch-name",
+  "namePatternHint": "Exakter Branch-Name oder ein Muster mit * als Platzhalter (z. B. passt \"release/*\" auf \"release/1.0\"). Ein exakter Treffer gewinnt immer; bei mehreren passenden Mustern gewinnt das oberste — Zeilen per Drag & Drop verschiebbar.",
+  "dragHandleTitle": "Zum Neuanordnen ziehen (höher = gewinnt bei mehreren passenden Mustern)",
+  "dragHandleAriaLabel": "Branch zum Neuanordnen ziehen",
   "removeBranchTitle": "Branch entfernen",
   "removeBranchAriaLabel": "Branch \"{name}\" entfernen",
 
