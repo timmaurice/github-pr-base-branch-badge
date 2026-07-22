@@ -1,0 +1,8 @@
+// Entry point compiled by scripts/build.mjs into dist/styles.css. Each
+// partial below is one component/concern (mirrors how src/content/*.js is
+// split) — @use, not the deprecated @import, so each partial's own
+// dependencies (variables, mixins) are declared where they're actually
+// used instead of relying on load order or a shared global scope.
+@use 'github-overrides';
+@use 'badge';
+@use 'filter-dropdown';

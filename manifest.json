@@ -20,13 +20,13 @@
   "permissions": ["storage"],
   "host_permissions": ["https://github.com/*", "https://api.github.com/*"],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "dist/background.js"
   },
   "content_scripts": [
     {
       "matches": ["https://github.com/*"],
-      "js": ["i18n.js", "content.js"],
-      "css": ["styles.css"],
+      "js": ["dist/content.js"],
+      "css": ["dist/styles.css"],
       "run_at": "document_end"
     }
   ]

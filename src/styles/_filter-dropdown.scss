@@ -1,0 +1,179 @@
+@use 'variables';
+@use 'mixins';
+
+// Theme colors (light/dark, tracked via isDarkMode() rather than a plain
+// `prefers-color-scheme` media query — GitHub's own dark-mode toggle isn't
+// solely OS-driven) are set once as custom properties on
+// .base-branch-filter-btn by ensureBaseBranchFilterButton() and inherited by
+// every element below — see filterDropdown.js.
+.base-branch-filter-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  align-self: stretch;
+  margin-right: 8px;
+}
+
+.base-branch-filter-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--fb-text);
+  cursor: pointer;
+  align-self: center;
+
+  &:hover,
+  &:focus-visible {
+    @include mixins.filter-hover-highlight;
+  }
+
+  &--active {
+    font-weight: 600;
+  }
+}
+
+.base-branch-filter-count {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background-color: variables.$github-accent-blue;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+
+  &--visible {
+    display: inline-flex;
+  }
+}
+
+.base-branch-filter-popover {
+  display: none;
+  flex-direction: column;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 6px;
+  width: 300px;
+  max-height: 380px;
+  background: var(--fb-bg);
+  border: 1px solid var(--fb-border);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  z-index: 100;
+  overflow: hidden;
+}
+
+.base-branch-filter-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  flex-shrink: 0;
+}
+
+.base-branch-filter-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--fb-text);
+}
+
+.base-branch-filter-close {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--fb-muted);
+  font-size: 13px;
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
+    @include mixins.filter-hover-highlight;
+  }
+}
+
+.base-branch-filter-divider {
+  height: 1px;
+  background: var(--fb-divider);
+  flex-shrink: 0;
+}
+
+.base-branch-filter-empty {
+  padding: 14px;
+  font-size: 12px;
+  color: var(--fb-muted);
+}
+
+.base-branch-filter-search-wrapper {
+  padding: 10px 14px;
+  flex-shrink: 0;
+}
+
+.base-branch-filter-search {
+  width: 100%;
+  padding: 6px 10px;
+  background: var(--fb-input-bg);
+  border: 1px solid var(--fb-input-border);
+  border-radius: 6px;
+  color: var(--fb-text);
+  font-size: 13px;
+
+  &:focus {
+    border-color: var(--fb-focus-ring);
+    box-shadow: 0 0 0 3px var(--fb-focus-ring-alpha);
+  }
+}
+
+.base-branch-filter-list {
+  overflow-y: auto;
+  padding: 4px 8px 8px;
+}
+
+.base-branch-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--fb-text);
+
+  &:hover,
+  &:focus-within {
+    @include mixins.filter-hover-highlight;
+  }
+}
+
+.base-branch-filter-checkbox {
+  cursor: pointer;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.base-branch-filter-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.base-branch-filter-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -3,10 +3,9 @@
 // with dynamic parts use {placeholder} tokens instead, filled in by
 // i18nText()'s optional third argument (a plain object, e.g. { branch: x }).
 //
-// Loaded before content.js/popup.js (see manifest.json content_scripts order
-// and popup.html's script tags). Both callers already gate their first
-// render behind an async chrome.storage.local.get callback (loadUiLanguage),
-// so i18nReady() slots into that same pattern rather than adding a new one.
+// Bundled into both content.js and popup.js by esbuild (see
+// scripts/build.mjs) — each output is a self-contained IIFE with its own
+// copy of this module, not a shared runtime.
 //
 // The actual fetch of locales/*.json happens in background.js, not here:
 // content scripts inherit the host page's CSP for fetch()/XHR, and GitHub's
@@ -18,7 +17,7 @@
 // To add a language: create locales/<code>.json with the same keys as
 // locales/en.json, register it in background.js's LOCALE_FILES map, and add
 // an <option> in popup.html's #language-select.
-const I18N_DEFAULT_LANG = 'en';
+export const I18N_DEFAULT_LANG = 'en';
 
 // In-memory cache of fetched dictionaries, keyed by language code — a page
 // (content script) or popup instance only ever fetches each language once,
@@ -45,7 +44,7 @@ function i18nFetchDict(lang, callback) {
 // Ensures both `lang`'s dictionary AND the default-language dictionary are
 // cached before calling back — the default acts as a fallback for any key
 // missing from `lang` (e.g. a language file mid-translation).
-function i18nReady(lang, callback) {
+export function i18nReady(lang, callback) {
   i18nFetchDict(I18N_DEFAULT_LANG, () => {
     if (lang === I18N_DEFAULT_LANG) {
       callback();
@@ -62,7 +61,7 @@ function i18nInterpolate(template, args) {
 }
 
 // Synchronous lookup — safe to call once i18nReady() has fired for `lang`.
-function i18nText(lang, key, args) {
+export function i18nText(lang, key, args) {
   const dict = I18N_CACHE[lang] || {};
   const fallbackDict = I18N_CACHE[I18N_DEFAULT_LANG] || {};
   const template = key in dict ? dict[key] : fallbackDict[key];

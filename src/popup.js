@@ -1,3 +1,5 @@
+import { I18N_DEFAULT_LANG, i18nReady, i18nText } from './shared/i18n.js';
+
 const DEFAULT_COLORS = {
   qas: '#3b82f6',
   int: '#f97316',

@@ -1,0 +1,10 @@
+// GitHub's filter toolbar row — ensures our injected base-branch-chip
+// is vertically centered alongside Author/Label/Projects/etc.
+// (.table-list-filters is a class on a <div>, not a custom element —
+// and .table-list-header-toggle is the actual flex row that holds
+// Author/Label/Projects/.../our chip as direct siblings)
+.table-list-filters,
+.table-list-filters > div,
+.table-list-header-toggle {
+  align-items: center;
+}

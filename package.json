@@ -2,8 +2,12 @@
   "name": "github-pr-base-branch-badge",
   "private": true,
   "version": "1.0.0",
-  "description": "Chrome extension — dev tooling only, the extension itself has no build step",
+  "type": "module",
+  "description": "Chrome extension — source lives in src/, esbuild bundles it to the root-level content.js/background.js/popup.js that manifest.json/popup.html reference",
   "scripts": {
+    "build": "node scripts/build.mjs",
+    "watch": "node scripts/build.mjs --watch",
+    "test": "node --test",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
@@ -11,9 +15,11 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "esbuild": "^0.28.1",
     "eslint": "^10.7.0",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.7.0",
-    "prettier": "^3.4.2"
+    "prettier": "^3.4.2",
+    "sass": "^1.101.3"
   }
 }
