@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "GitHub PR Base Branch Badge",
+  "version": "1.0.0",
+  "description": "Shows base branch of PRs in GitHub list view with click-to-filter functionality",
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "action": {
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    },
+    "default_title": "GitHub PR Base Branch Badge - Einstellungen",
+    "default_popup": "popup.html"
+  },
+  "permissions": ["scripting", "storage"],
+  "host_permissions": [
+    "https://github.com/*",
+    "https://api.github.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://github.com/*"],
+      "js": ["content.js"],
+      "css": ["styles.css"],
+      "run_at": "document_end"
+    }
+  ]
+}
