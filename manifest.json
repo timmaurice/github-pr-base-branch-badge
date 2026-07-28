@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "GitHub PR Base Branch Badge",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Shows base branch of PRs in GitHub list view with click-to-filter functionality",
   "icons": {
     "16": "icon16.png",
