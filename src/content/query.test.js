@@ -4,7 +4,8 @@ import {
   getSelectedBaseBranches,
   removeBaseFilters,
   buildQueryForBaseBranches,
-  navigateToQuery
+  navigateToQuery,
+  isClosedQuery
 } from './query.js';
 
 // getSelectedBaseBranches reads window.location.search directly with no way
@@ -67,6 +68,12 @@ test('buildQueryForBaseBranches builds a fresh open-PR query when the original i
 
 test('buildQueryForBaseBranches preserves is:closed from the original query', () => {
   assert.equal(buildQueryForBaseBranches(['main'], 'is:closed'), 'is:closed base:main');
+});
+
+test('isClosedQuery detects is:closed', () => {
+  assert.equal(isClosedQuery('is:pr is:closed'), true);
+  assert.equal(isClosedQuery('is:pr is:open'), false);
+  assert.equal(isClosedQuery(''), false);
 });
 
 test('navigateToQuery sets q and drops a stale page param', () => {

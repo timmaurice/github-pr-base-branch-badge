@@ -11,6 +11,7 @@ import {
 import { getCachedBranch, setCachedBranch } from './storageCache.js';
 import { buildQueryForBaseBranches } from './query.js';
 import { adjustColor, resolveBranchColor, getContrastTextColor } from './utils.js';
+import { graphqlRequest } from './githubApi.js';
 
 // Resolves badges for every not-yet-processed row from cache (memory or
 // storage, both local — no network), then fetches whatever's left over the
@@ -101,8 +102,6 @@ async function fetchPendingViaGraphQL(pending) {
   }
 }
 
-const GRAPHQL_URL = 'https://api.github.com/graphql';
-
 async function fetchRepoBaseBranchesGraphQL(items) {
   const { owner, repo } = items[0].parsed;
   // JSON.stringify safely quotes/escapes owner/repo as GraphQL string
@@ -118,14 +117,7 @@ async function fetchRepoBaseBranchesGraphQL(items) {
 }`;
 
   try {
-    const response = await fetch(GRAPHQL_URL, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${githubToken}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ query })
-    });
+    const response = await graphqlRequest(query, githubToken);
 
     if (!response.ok) {
       console.warn(

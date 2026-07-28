@@ -1,7 +1,14 @@
 import { i18nText } from '../shared/i18n.js';
-import { uiLanguage, branchColors, discoveredBranches } from './state.js';
-import { getSelectedBaseBranches, buildQueryForBaseBranches, navigateToQuery } from './query.js';
+import { uiLanguage, branchColors, discoveredBranches, githubToken } from './state.js';
+import {
+  getSelectedBaseBranches,
+  buildQueryForBaseBranches,
+  navigateToQuery,
+  isClosedQuery
+} from './query.js';
 import { isPRListPage, resolveBranchColor } from './utils.js';
+import { repoKeyFromPath } from '../shared/repoKey.js';
+import { graphqlRequest } from './githubApi.js';
 
 // Adds a "Base Branch ▾" dropdown before the Author button, offering a
 // checkbox per known branch — mirrors GitHub's own "Filter by author"
@@ -116,6 +123,12 @@ function buildBranchRow(branch, selected) {
   label.className = 'base-branch-filter-label';
   label.textContent = branch;
 
+  // Filled in later by fetchBranchCounts() once the batched PR-count
+  // request resolves (only fetched when a token is set) — left empty until
+  // then rather than showing a placeholder like "(0)" that could be wrong.
+  const countBadge = document.createElement('span');
+  countBadge.className = 'base-branch-filter-row-count';
+
   checkbox.addEventListener('change', () => {
     const current = new Set(getSelectedBaseBranches());
     if (checkbox.checked) current.add(branch);
@@ -136,7 +149,45 @@ function buildBranchRow(branch, selected) {
   row.appendChild(checkbox);
   row.appendChild(dot);
   row.appendChild(label);
+  row.appendChild(countBadge);
   return row;
+}
+
+// One batched GraphQL request for every branch's PR count (rather than one
+// REST search per branch) — same rationale as badge.js's batched base-branch
+// lookups: it's one request instead of N. `search(...).issueCount` gives an
+// exact total across the whole repo, not just PRs scanned/badged so far.
+// GraphQL requires auth, so this silently does nothing without a token.
+async function fetchBranchCounts(repoKey, branches, isClosed) {
+  if (!githubToken || branches.length === 0) return new Map();
+
+  const state = isClosed ? 'is:closed' : 'is:open';
+  const fields = branches
+    .map((branch, i) => {
+      // JSON.stringify safely quotes/escapes the whole search-query string
+      // as a GraphQL string literal, regardless of what repoKey/branch
+      // contain.
+      const searchQuery = `repo:${repoKey} is:pr ${state} base:${branch}`;
+      return `b${i}: search(query: ${JSON.stringify(searchQuery)}, type: ISSUE, first: 1) { issueCount }`;
+    })
+    .join('\n');
+  const query = `query {\n${fields}\n}`;
+
+  try {
+    const response = await graphqlRequest(query, githubToken);
+    if (!response.ok) return new Map();
+
+    const payload = await response.json();
+    const counts = new Map();
+    branches.forEach((branch, i) => {
+      const issueCount = payload.data && payload.data[`b${i}`] && payload.data[`b${i}`].issueCount;
+      if (typeof issueCount === 'number') counts.set(branch, issueCount);
+    });
+    return counts;
+  } catch (error) {
+    console.warn('Base Branch Badge: failed to fetch branch PR counts', error);
+    return new Map();
+  }
 }
 
 // Only rows currently visible under the search filter are valid stops —
@@ -206,9 +257,24 @@ function renderFilterPopoverContent(popover, onClose) {
   wireBranchListKeyboardNav(searchInput, listContainer);
 
   const selected = new Set(getSelectedBaseBranches());
+  const rowsByBranch = new Map();
   allBranches.forEach((branch) => {
-    listContainer.appendChild(buildBranchRow(branch, selected));
+    const row = buildBranchRow(branch, selected);
+    rowsByBranch.set(branch, row);
+    listContainer.appendChild(row);
   });
+
+  const repoKey = repoKeyFromPath(window.location.pathname);
+  if (repoKey) {
+    const isClosed = isClosedQuery(new URLSearchParams(window.location.search).get('q') || '');
+    fetchBranchCounts(repoKey, allBranches, isClosed).then((counts) => {
+      counts.forEach((count, branch) => {
+        const row = rowsByBranch.get(branch);
+        const badge = row && row.querySelector('.base-branch-filter-row-count');
+        if (badge) badge.textContent = `(${count})`;
+      });
+    });
+  }
 }
 
 // Wires the button click → open/close + render-on-open behavior. Popover

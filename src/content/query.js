@@ -17,13 +17,20 @@ export function removeBaseFilters(query) {
     .trim();
 }
 
+// Shared with filterDropdown.js's per-branch PR-count fetch, so both the
+// query builder and the count query match whichever state (open/closed)
+// the current search is actually showing.
+export function isClosedQuery(query) {
+  return /\bis:closed\b/.test(query);
+}
+
 export function buildQueryForBaseBranches(branches, originalQuery) {
   // window.location is only read when the caller doesn't supply
   // originalQuery — a plain `const params = new URLSearchParams(...)` above
   // this would read it unconditionally, making the function needlessly
   // coupled to a page context even when called with an explicit query.
   const original = originalQuery ?? new URLSearchParams(window.location.search).get('q') ?? '';
-  const isClosed = /\bis:closed\b/.test(original);
+  const isClosed = isClosedQuery(original);
 
   const query = removeBaseFilters(original);
 

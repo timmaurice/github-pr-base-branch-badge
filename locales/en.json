@@ -45,5 +45,17 @@
   "clearDiscoveredDone": "✓ Cleared!",
   "discoveredSectionTitle": "Discovered branches (no color set)",
   "removeDiscoveredTitle": "Remove from discovered branches",
-  "removeDiscoveredAriaLabel": "Remove \"{name}\" from discovered branches"
+  "removeDiscoveredAriaLabel": "Remove \"{name}\" from discovered branches",
+
+  "repoContextLabel": "Editing colors for {repo}",
+  "repoContextTemplateLabel": "No active GitHub repo tab detected — editing the default template used for new repos",
+
+  "addSuggestedBranchTitle": "Add as a colored branch",
+  "scanBranchesBtn": "🔎 Scan branches",
+  "scanBranchesTitle": "Looks at recent PRs (open and closed) and suggests only the branches they actually target — not every git branch in the repo",
+  "scanningBranches": "Scanning…",
+  "scanBranchesDone": "✓ Found {count} target branch(es)",
+  "scanBranchesDoneTruncated": "✓ Found {count}+ target branch(es) (stopped at the page limit)",
+  "scanBranchesFailed": "✗ Scan failed: {message}",
+  "scanBranchesNoRepo": "✗ No active repo to scan"
 }

@@ -1,4 +1,14 @@
 import { I18N_DEFAULT_LANG, i18nReady, i18nText } from './shared/i18n.js';
+import { repoKeyFromPath } from './shared/repoKey.js';
+
+// Storage key for the repo currently being edited (see resolveActiveRepoKey
+// and CLAUDE.md's "Branch colors" section); REPO_TEMPLATE_KEY is both the
+// seed copied into a repo the first time it's opened here, and the fallback
+// "no repo" edit target when no GitHub tab/last-active-repo is known at all.
+function repoStorageKey(repoKey) {
+  return `repoBranchColors:${repoKey}`;
+}
+const REPO_TEMPLATE_KEY = 'repoBranchColorsTemplate';
 
 const DEFAULT_COLORS = {
   main: '#10b981',
@@ -8,6 +18,15 @@ const DEFAULT_COLORS = {
   default: '#6b7280'
 };
 
+// What a genuinely brand-new repo (no template, no legacy global colors to
+// migrate — see loadSettings()) starts with: just the fallback color, no
+// guessed example branches. Real branch names now come from suggestions
+// (discovered/scanned branches — see renderDiscoveredBranches()/
+// scanBranches()) instead of a fixed list that usually doesn't match the
+// repo's actual branches (visible once PR counts showed "(0)" next to
+// invented names like "develop"/"staging" on repos that don't have them).
+const EMPTY_SEED_COLORS = { default: DEFAULT_COLORS.default };
+
 const NEW_BRANCH_PALETTE = ['#8b5cf6', '#06b6d4', '#ec4899', '#84cc16', '#f59e0b', '#14b8a6'];
 let paletteIndex = 0;
 
@@ -15,8 +34,11 @@ let paletteIndex = 0;
 // memory so a language switch can re-render immediately without a storage
 // round-trip.
 let currentLang = I18N_DEFAULT_LANG;
-let currentColors = DEFAULT_COLORS;
+let currentColors = EMPTY_SEED_COLORS;
 let currentDiscovered = [];
+// "owner/repo" of the repo currently being configured, or null when editing
+// the shared template (see resolveActiveRepoKey/loadSettings).
+let currentRepoKey = null;
 
 function t(key, args) {
   return i18nText(currentLang, key, args);
@@ -29,9 +51,12 @@ const tokenTestBtn = document.getElementById('token-test-btn');
 const tokenTestResult = document.getElementById('token-test-result');
 const languageSelect = document.getElementById('language-select');
 const clearDiscoveredBtn = document.getElementById('clear-discovered-btn');
+const clearDiscoveredRow = document.getElementById('clear-discovered-row');
 const discoveredSection = document.getElementById('discovered-section');
 const discoveredTitleText = document.getElementById('discovered-title-text');
 const discoveredChips = document.getElementById('discovered-chips');
+const repoContext = document.getElementById('repo-context');
+const scanBranchesBtn = document.getElementById('scan-branches-btn');
 
 document.getElementById('version-footer').textContent = `v${chrome.runtime.getManifest().version}`;
 
@@ -42,6 +67,7 @@ tokenTestBtn.addEventListener('click', testToken);
 tokenToggleBtn.addEventListener('click', toggleTokenVisibility);
 languageSelect.addEventListener('change', onLanguageChange);
 clearDiscoveredBtn.addEventListener('click', clearDiscoveredBranches);
+scanBranchesBtn.addEventListener('click', scanBranches);
 
 // Broadcasts a message to every open github.com tab so content.js can react
 // (rebuild badges/filter UI) without requiring a manual page reload.
@@ -67,6 +93,7 @@ function onLanguageChange() {
   chrome.storage.sync.set({ uiLanguage: currentLang }, () => {
     i18nReady(currentLang, () => {
       applyStaticTranslations();
+      renderRepoContext();
       renderRows(currentColors);
       broadcastToGithubTabs('reloadBadges');
     });
@@ -74,9 +101,9 @@ function onLanguageChange() {
 }
 
 function clearDiscoveredBranches() {
-  if (!window.confirm(t('clearDiscoveredConfirm'))) return;
+  if (!currentRepoKey || !window.confirm(t('clearDiscoveredConfirm'))) return;
 
-  chrome.storage.local.set({ discoveredBranches: [] }, () => {
+  chrome.storage.local.set({ [`discoveredBranches:${currentRepoKey}`]: [] }, () => {
     currentDiscovered = [];
     renderDiscoveredBranches();
     broadcastToGithubTabs('clearDiscoveredBranches');
@@ -84,23 +111,45 @@ function clearDiscoveredBranches() {
   });
 }
 
-// Only branches with no configured color are shown here — colored ones stay
-// in the filter dropdown regardless of `discoveredBranches` (see
-// filterDropdown.js), so removing them from this list wouldn't do anything
-// visible and would just be confusing.
-function renderDiscoveredBranches() {
-  const coloredNames = new Set(Object.keys(currentColors));
-  const extras = currentDiscovered.filter((name) => !coloredNames.has(name)).sort();
+// Names that already have a row in the popup right now, saved or not — used
+// to hide a discovered-branch suggestion the moment it's added (see
+// addSuggestedBranch()), rather than waiting for Save.
+function currentRowNames() {
+  return new Set(
+    Array.from(list.querySelectorAll('.branch-name-input'))
+      .map((el) => el.value.trim())
+      .filter(Boolean)
+  );
+}
 
+// Only branches with no row yet are shown here, as suggestions pulled from
+// real branch names (badges seen so far, or "Scan branches" below) — colored
+// ones stay in the filter dropdown regardless of `discoveredBranches` (see
+// filterDropdown.js), so suggesting them again would just be confusing.
+// The header (title + scan button) stays visible even with zero
+// suggestions, whenever a repo is active — scanning is most useful exactly
+// when nothing's been discovered yet.
+function renderDiscoveredBranches() {
+  const coloredNames = currentRowNames();
+  const extras = currentRepoKey
+    ? currentDiscovered.filter((name) => !coloredNames.has(name)).sort()
+    : [];
+
+  clearDiscoveredRow.style.display = currentRepoKey ? '' : 'none';
+  discoveredSection.style.display = currentRepoKey ? '' : 'none';
   discoveredChips.innerHTML = '';
-  discoveredSection.style.display = extras.length ? '' : 'none';
+  discoveredChips.style.display = extras.length ? '' : 'none';
 
   extras.forEach((branch) => {
     const chip = document.createElement('span');
     chip.className = 'discovered-chip';
 
-    const label = document.createElement('span');
+    const label = document.createElement('button');
+    label.type = 'button';
+    label.className = 'discovered-chip-label';
     label.textContent = branch;
+    label.title = t('addSuggestedBranchTitle');
+    label.addEventListener('click', () => addSuggestedBranch(branch));
 
     const removeBtn = document.createElement('button');
     removeBtn.type = 'button';
@@ -115,12 +164,94 @@ function renderDiscoveredBranches() {
   });
 }
 
+function addSuggestedBranch(branch) {
+  addBranchRow(branch);
+  renderDiscoveredBranches();
+}
+
 function removeDiscoveredBranch(branch) {
+  if (!currentRepoKey) return;
   currentDiscovered = currentDiscovered.filter((name) => name !== branch);
-  chrome.storage.local.set({ discoveredBranches: currentDiscovered }, () => {
+  chrome.storage.local.set({ [`discoveredBranches:${currentRepoKey}`]: currentDiscovered }, () => {
     renderDiscoveredBranches();
     broadcastToGithubTabs('discoveredBranchesChanged');
   });
+}
+
+const SCAN_BRANCHES_MAX_PAGES = 10; // 1000 PRs at 100/page — plenty for any real repo
+
+// Fetches the *distinct base branches actually targeted by PRs* (state=all,
+// so closed PRs count too — not just currently-open ones), not every git
+// branch in the repo. An earlier version hit GitHub's plain /branches
+// endpoint instead, which pulled in every feature/personal/stale branch
+// that was never a PR target — exactly the noise this list exists to avoid.
+// Follows the Link header for pagination, capped at SCAN_BRANCHES_MAX_PAGES
+// so a repo with an unusual number of PRs can't turn this into a runaway
+// loop; `truncated` tells the caller whether the cap was actually hit (in
+// which case some older/rarer base branches may not have been seen yet).
+async function fetchRecentBaseBranches(repoKey, token) {
+  const [owner, repo] = repoKey.split('/');
+  const headers = { Accept: 'application/vnd.github+json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const branches = new Set();
+  let url = `https://api.github.com/repos/${owner}/${repo}/pulls?state=all&per_page=100`;
+  let pageCount = 0;
+
+  while (url && pageCount < SCAN_BRANCHES_MAX_PAGES) {
+    const response = await fetch(url, { headers });
+    if (!response.ok) {
+      throw new Error(`GitHub API returned ${response.status}`);
+    }
+
+    const data = await response.json();
+    data.forEach((pr) => {
+      if (pr.base && pr.base.ref) branches.add(pr.base.ref);
+    });
+
+    const nextMatch = (response.headers.get('link') || '').match(/<([^>]+)>;\s*rel="next"/);
+    url = nextMatch ? nextMatch[1] : null;
+    pageCount++;
+  }
+
+  return { branches: Array.from(branches), truncated: Boolean(url) };
+}
+
+async function scanBranches() {
+  if (!currentRepoKey) {
+    showStatus(t('scanBranchesNoRepo'), 'error');
+    return;
+  }
+
+  scanBranchesBtn.disabled = true;
+  scanBranchesBtn.textContent = t('scanningBranches');
+
+  try {
+    const { branches, truncated } = await fetchRecentBaseBranches(
+      currentRepoKey,
+      tokenInput.value.trim()
+    );
+    currentDiscovered = Array.from(new Set([...currentDiscovered, ...branches]));
+
+    chrome.storage.local.set(
+      { [`discoveredBranches:${currentRepoKey}`]: currentDiscovered },
+      () => {
+        renderDiscoveredBranches();
+        broadcastToGithubTabs('discoveredBranchesChanged');
+        showStatus(
+          t(truncated ? 'scanBranchesDoneTruncated' : 'scanBranchesDone', {
+            count: branches.length
+          }),
+          'success'
+        );
+      }
+    );
+  } catch (err) {
+    showStatus(t('scanBranchesFailed', { message: err.message }), 'error');
+  } finally {
+    scanBranchesBtn.disabled = false;
+    scanBranchesBtn.textContent = t('scanBranchesBtn');
+  }
 }
 
 // Applies translated text to the elements that don't get rebuilt by
@@ -138,6 +269,8 @@ function applyStaticTranslations() {
   document.getElementById('reset-btn').textContent = t('resetBtn');
   clearDiscoveredBtn.textContent = t('clearDiscoveredBtn');
   discoveredTitleText.textContent = t('discoveredSectionTitle');
+  scanBranchesBtn.textContent = t('scanBranchesBtn');
+  scanBranchesBtn.title = t('scanBranchesTitle');
 }
 
 // Verifies the token in the input field (not the saved one) against the
@@ -187,39 +320,90 @@ function showTokenResult(message, type) {
   tokenTestResult.className = `token-test-result ${type}`;
 }
 
-function loadSettings() {
-  // branchColors/uiLanguage live in storage.sync (so they follow the user
-  // across machines); githubToken and discoveredBranches stay local-only —
-  // the token for security (never want it round-tripping through a Google
-  // account), discoveredBranches because it's a large, ever-growing cache
-  // that isn't worth the sync quota (see CLAUDE.md).
-  chrome.storage.local.get(
-    ['githubToken', 'discoveredBranches', 'branchColors', 'uiLanguage'],
-    (localResult) => {
-      chrome.storage.sync.get(['branchColors', 'uiLanguage'], (syncResult) => {
-        currentLang = syncResult.uiLanguage || localResult.uiLanguage || I18N_DEFAULT_LANG;
-        currentColors = syncResult.branchColors || localResult.branchColors || DEFAULT_COLORS;
-        currentDiscovered = localResult.discoveredBranches || [];
-
-        // One-time migration for installs that already had local settings
-        // from before sync support existed: copy them up so they show up
-        // on other machines too, without waiting for the user to hit Save.
-        if (!syncResult.branchColors && localResult.branchColors) {
-          chrome.storage.sync.set({ branchColors: localResult.branchColors });
-        }
-        if (!syncResult.uiLanguage && localResult.uiLanguage) {
-          chrome.storage.sync.set({ uiLanguage: localResult.uiLanguage });
-        }
-
-        i18nReady(currentLang, () => {
-          applyStaticTranslations();
-          renderRows(currentColors);
-          renderDiscoveredBranches();
-          tokenInput.value = localResult.githubToken || '';
-        });
-      });
+// Which repo's config the popup edits: the active GitHub tab's repo (if
+// it's a PR/issues page — see repoKeyFromPath), else whichever repo was
+// last edited here, else null (edits the shared template instead — see
+// REPO_TEMPLATE_KEY). Reading the active tab's URL needs no extra
+// permission beyond the "https://github.com/*" host permission we already
+// have for content scripts/API calls (host permission alone is enough for
+// chrome.tabs to expose a matching tab's url).
+function resolveActiveRepoKey(callback) {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    const tab = tabs && tabs[0];
+    const fromTab = tab && tab.url ? repoKeyFromPath(new URL(tab.url).pathname) : null;
+    if (fromTab) {
+      callback(fromTab);
+      return;
     }
-  );
+    chrome.storage.local.get('lastActiveRepoKey', (result) => {
+      callback(result.lastActiveRepoKey || null);
+    });
+  });
+}
+
+function loadSettings() {
+  resolveActiveRepoKey((repoKey) => {
+    currentRepoKey = repoKey;
+    const colorsKey = repoKey ? repoStorageKey(repoKey) : REPO_TEMPLATE_KEY;
+    const discoveredKey = repoKey ? `discoveredBranches:${repoKey}` : null;
+
+    // branchColors/uiLanguage live in storage.sync (so they follow the user
+    // across machines); githubToken and discoveredBranches stay local-only —
+    // the token for security (never want it round-tripping through a Google
+    // account), discoveredBranches because it's a large, ever-growing cache
+    // that isn't worth the sync quota (see CLAUDE.md).
+    chrome.storage.local.get(
+      ['githubToken', discoveredKey, 'branchColors', 'uiLanguage'].filter(Boolean),
+      (localResult) => {
+        chrome.storage.sync.get(
+          [colorsKey, REPO_TEMPLATE_KEY, 'branchColors', 'uiLanguage'],
+          (syncResult) => {
+            currentLang = syncResult.uiLanguage || localResult.uiLanguage || I18N_DEFAULT_LANG;
+            currentColors =
+              syncResult[colorsKey] ||
+              syncResult[REPO_TEMPLATE_KEY] ||
+              syncResult.branchColors ||
+              localResult.branchColors ||
+              EMPTY_SEED_COLORS;
+            currentDiscovered = (discoveredKey && localResult[discoveredKey]) || [];
+
+            // One-time migrations for installs from before this feature (or
+            // before sync support) existed — see CLAUDE.md's "Branch colors".
+            if (!syncResult[REPO_TEMPLATE_KEY]) {
+              const legacy = syncResult.branchColors || localResult.branchColors;
+              if (legacy) chrome.storage.sync.set({ [REPO_TEMPLATE_KEY]: legacy });
+            }
+            if (!syncResult.uiLanguage && localResult.uiLanguage) {
+              chrome.storage.sync.set({ uiLanguage: localResult.uiLanguage });
+            }
+
+            // Persist a brand-new repo's seeded colors right away, so
+            // reopening the popup shows the same values even before Save.
+            if (repoKey && !syncResult[colorsKey]) {
+              chrome.storage.sync.set({ [colorsKey]: currentColors });
+            }
+            if (repoKey) {
+              chrome.storage.local.set({ lastActiveRepoKey: repoKey });
+            }
+
+            i18nReady(currentLang, () => {
+              applyStaticTranslations();
+              renderRepoContext();
+              renderRows(currentColors);
+              renderDiscoveredBranches();
+              tokenInput.value = localResult.githubToken || '';
+            });
+          }
+        );
+      }
+    );
+  });
+}
+
+function renderRepoContext() {
+  repoContext.textContent = currentRepoKey
+    ? t('repoContextLabel', { repo: currentRepoKey })
+    : t('repoContextTemplateLabel');
 }
 
 function renderRows(colors) {
@@ -236,7 +420,7 @@ function renderRows(colors) {
   addBtn.type = 'button';
   addBtn.className = 'add-branch-btn';
   addBtn.textContent = t('addBranchBtn');
-  addBtn.addEventListener('click', addBranchRow);
+  addBtn.addEventListener('click', () => addBranchRow());
   list.appendChild(addBtn);
 
   list.appendChild(buildRow('default', defaultColor, true));
@@ -420,16 +604,22 @@ function buildRow(name, color, isDefault) {
   return rowEl;
 }
 
-function addBranchRow() {
+// `name` prefills a suggested branch (see addSuggestedBranch()); an empty
+// name is the plain "+ Add branch" case, where the input is focused so
+// typing can start immediately — a prefilled row is already complete, so
+// it isn't forced into focus.
+function addBranchRow(name = '') {
   const addBtn = list.querySelector('.add-branch-btn');
   const color = NEW_BRANCH_PALETTE[paletteIndex % NEW_BRANCH_PALETTE.length];
   paletteIndex++;
 
-  const row = buildRow('', color, false);
+  const row = buildRow(name, color, false);
   list.insertBefore(row, addBtn);
 
-  const newNameInput = row.querySelector('.branch-name-input');
-  if (newNameInput) newNameInput.focus();
+  if (!name) {
+    const newNameInput = row.querySelector('.branch-name-input');
+    if (newNameInput) newNameInput.focus();
+  }
 
   validateAllNameFields();
 }
@@ -463,9 +653,10 @@ function saveSettings() {
   if (hasError) return;
 
   const githubToken = tokenInput.value.trim();
+  const colorsKey = currentRepoKey ? repoStorageKey(currentRepoKey) : REPO_TEMPLATE_KEY;
 
   chrome.storage.local.set({ githubToken }, () => {
-    chrome.storage.sync.set({ branchColors: colors }, () => {
+    chrome.storage.sync.set({ [colorsKey]: colors }, () => {
       currentColors = colors;
       showStatus(t('statusSaved'), 'success');
       renderRows(colors);
@@ -478,9 +669,11 @@ function saveSettings() {
 function resetSettings() {
   if (!window.confirm(t('confirmReset'))) return;
 
-  chrome.storage.sync.set({ branchColors: DEFAULT_COLORS }, () => {
-    currentColors = DEFAULT_COLORS;
-    renderRows(DEFAULT_COLORS);
+  const colorsKey = currentRepoKey ? repoStorageKey(currentRepoKey) : REPO_TEMPLATE_KEY;
+
+  chrome.storage.sync.set({ [colorsKey]: EMPTY_SEED_COLORS }, () => {
+    currentColors = EMPTY_SEED_COLORS;
+    renderRows(EMPTY_SEED_COLORS);
     renderDiscoveredBranches();
     showStatus(t('statusReset'), 'success');
     broadcastToGithubTabs('reloadBadges');

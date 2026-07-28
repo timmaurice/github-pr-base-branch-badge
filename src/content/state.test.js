@@ -11,6 +11,11 @@ import {
 // file (state.js has no reset hook) — each test clears it up front rather
 // than relying on run order.
 
+// No globalThis.window is defined in this Node test environment, so every
+// discoveredBranches storage key below resolves to the 'unknown' repo
+// bucket (discoveredBranchesStorageKey()'s fallback) rather than a real
+// "owner/repo" one — repo-specific keying is covered separately below.
+
 test('rememberDiscoveredBranch adds a new branch and persists the full set', () => {
   discoveredBranches.clear();
   let persisted;
@@ -18,7 +23,7 @@ test('rememberDiscoveredBranch adds a new branch and persists the full set', () 
     storage: {
       local: {
         set(items) {
-          persisted = items.discoveredBranches;
+          persisted = items['discoveredBranches:unknown'];
         }
       }
     }
@@ -56,8 +61,8 @@ test('loadDiscoveredBranches merges persisted branches into the in-memory set', 
     storage: {
       local: {
         get(key, callback) {
-          assert.equal(key, 'discoveredBranches');
-          callback({ discoveredBranches: ['develop', 'staging'] });
+          assert.equal(key, 'discoveredBranches:unknown');
+          callback({ 'discoveredBranches:unknown': ['develop', 'staging'] });
         }
       }
     }
@@ -93,7 +98,7 @@ test('resyncDiscoveredBranches drops a name no longer in storage', () => {
     storage: {
       local: {
         get(key, callback) {
-          callback({ discoveredBranches: ['staging'] });
+          callback({ 'discoveredBranches:unknown': ['staging'] });
         }
       }
     }
@@ -106,4 +111,28 @@ test('resyncDiscoveredBranches drops a name no longer in storage', () => {
 
   assert.deepEqual([...discoveredBranches], ['staging']);
   assert.equal(callbackCalled, true);
+});
+
+test('rememberDiscoveredBranch scopes the storage key to the current repo', () => {
+  discoveredBranches.clear();
+  const originalWindow = globalThis.window;
+  globalThis.window = { location: { pathname: '/home-assistant/core/pulls' } };
+
+  let persistedKey;
+  globalThis.chrome = {
+    storage: {
+      local: {
+        set(items) {
+          persistedKey = Object.keys(items)[0];
+        }
+      }
+    }
+  };
+
+  try {
+    rememberDiscoveredBranch('electrolux');
+    assert.equal(persistedKey, 'discoveredBranches:home-assistant/core');
+  } finally {
+    globalThis.window = originalWindow;
+  }
 });

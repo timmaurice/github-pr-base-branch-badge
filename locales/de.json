@@ -45,5 +45,17 @@
   "clearDiscoveredDone": "✓ Zurückgesetzt!",
   "discoveredSectionTitle": "Erkannte Branches (keine Farbe gesetzt)",
   "removeDiscoveredTitle": "Aus erkannten Branches entfernen",
-  "removeDiscoveredAriaLabel": "\"{name}\" aus erkannten Branches entfernen"
+  "removeDiscoveredAriaLabel": "\"{name}\" aus erkannten Branches entfernen",
+
+  "repoContextLabel": "Farben werden bearbeitet für {repo}",
+  "repoContextTemplateLabel": "Kein aktiver GitHub-Repo-Tab erkannt — es wird die Standardvorlage für neue Repos bearbeitet",
+
+  "addSuggestedBranchTitle": "Als eingefärbten Branch hinzufügen",
+  "scanBranchesBtn": "🔎 Branches scannen",
+  "scanBranchesTitle": "Schaut sich aktuelle PRs (offen und geschlossen) an und schlägt nur die Branches vor, die tatsächlich als Ziel dienen — nicht jeden Git-Branch im Repo",
+  "scanningBranches": "Scanne…",
+  "scanBranchesDone": "✓ {count} Ziel-Branch(es) gefunden",
+  "scanBranchesDoneTruncated": "✓ {count}+ Ziel-Branch(es) gefunden (Seitenlimit erreicht)",
+  "scanBranchesFailed": "✗ Scan fehlgeschlagen: {message}",
+  "scanBranchesNoRepo": "✗ Kein aktives Repo zum Scannen"
 }

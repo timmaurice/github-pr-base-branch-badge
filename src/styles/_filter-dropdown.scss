@@ -208,3 +208,11 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.base-branch-filter-row-count {
+  margin-left: auto;
+  padding-left: 8px;
+  font-weight: 400;
+  color: variables.$gh-fg-muted;
+  flex-shrink: 0;
+}
