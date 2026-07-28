@@ -1,22 +1,8 @@
-// Loader/lookup for the per-language JSON files in locales/*.json. JSON has
-// no room for the interpolation functions the old i18n.js used, so strings
-// with dynamic parts use {placeholder} tokens instead, filled in by
-// i18nText()'s optional third argument (a plain object, e.g. { branch: x }).
-//
-// Bundled into both content.js and popup.js by esbuild (see
-// scripts/build.mjs) — each output is a self-contained IIFE with its own
-// copy of this module, not a shared runtime.
-//
-// The actual fetch of locales/*.json happens in background.js, not here:
-// content scripts inherit the host page's CSP for fetch()/XHR, and GitHub's
-// CSP blocks a direct fetch to the chrome-extension:// URL (confirmed by a
-// "failed to load locale" error in the page console). The service worker
-// isn't subject to that CSP, so this file just messages it and caches the
-// result — mirrors the existing getCachedBranch/setCachedBranch pattern.
-//
-// To add a language: create locales/<code>.json with the same keys as
-// locales/en.json, register it in background.js's LOCALE_FILES map, and add
-// an <option> in popup.html's #language-select.
+// Loader/lookup for the per-language JSON files in locales/*.json — strings
+// with dynamic parts use {placeholder} tokens, filled in by i18nText()'s
+// optional third argument. Fetching happens in background.js, not here (see
+// CLAUDE.md's "UI language / i18n" section for why); this file just messages
+// it and caches the result.
 export const I18N_DEFAULT_LANG = 'en';
 
 // In-memory cache of fetched dictionaries, keyed by language code — a page

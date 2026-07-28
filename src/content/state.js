@@ -7,7 +7,6 @@ export const branchCache = new Map();
 // configured color — lets the filter dropdown offer them too.
 export const discoveredBranches = new Set();
 
-// Default colors
 export const DEFAULT_COLORS = {
   main: '#10b981',
   develop: '#f97316',

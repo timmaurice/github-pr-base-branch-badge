@@ -283,14 +283,8 @@ function buildRow(name, color, isDefault) {
   hex.maxLength = 7;
   hex.value = color;
 
-  const preview = document.createElement('span');
-  preview.className = 'preview';
-  preview.style.backgroundColor = color;
-  preview.textContent = isDefault ? t('previewDefaultText') : name || t('previewPlaceholder');
-
   picker.addEventListener('input', () => {
     hex.value = picker.value;
-    preview.style.backgroundColor = picker.value;
     swatchDisplay.style.backgroundColor = picker.value;
   });
 
@@ -302,13 +296,11 @@ function buildRow(name, color, isDefault) {
       return;
     }
     picker.value = val;
-    preview.style.backgroundColor = val;
     swatchDisplay.style.backgroundColor = val;
   });
 
   if (!isDefault) {
     nameEl.addEventListener('input', () => {
-      preview.textContent = nameEl.value.trim() || t('previewPlaceholder');
       validateAllNameFields();
     });
   }
@@ -329,7 +321,7 @@ function buildRow(name, color, isDefault) {
     });
   }
 
-  rowEl.append(dragHandle, nameEl, swatchWrapper, hex, preview, removeBtn);
+  rowEl.append(dragHandle, nameEl, swatchWrapper, hex, removeBtn);
 
   if (!isDefault) {
     rowEl.addEventListener('dragenter', (e) => e.preventDefault());

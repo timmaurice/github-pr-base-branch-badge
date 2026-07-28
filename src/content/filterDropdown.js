@@ -1,7 +1,7 @@
 import { i18nText } from '../shared/i18n.js';
 import { uiLanguage, branchColors, discoveredBranches } from './state.js';
 import { getSelectedBaseBranches, buildQueryForBaseBranches, navigateToQuery } from './query.js';
-import { isPRListPage, isDarkMode, resolveBranchColor } from './utils.js';
+import { isPRListPage, resolveBranchColor } from './utils.js';
 
 // Adds a "Base Branch ▾" dropdown before the Author button, offering a
 // checkbox per known branch — mirrors GitHub's own "Filter by author"
@@ -9,41 +9,9 @@ import { isPRListPage, isDarkMode, resolveBranchColor } from './utils.js';
 //
 // Split into one builder/renderer per piece (button, popover shell, header,
 // search, branch row) so each part can be read and changed in isolation;
-// ensureBaseBranchFilterButton() below is just the orchestrator.
-//
-// Theme colors are set once, as CSS custom properties on the wrapper (see
-// ensureBaseBranchFilterButton), and inherited by every descendant class in
-// styles.css — none of the builders below touch colors directly, which is
-// also what lets :hover/:focus-visible work at all (a style.cssText block
-// on each element used to shadow the stylesheet, including its
-// pseudo-classes, forcing mouseenter/mouseleave/focus/blur listeners to
-// fake what CSS already does).
-
-function getFilterPopoverColors(dark) {
-  return dark
-    ? {
-        bg: '#1c2128',
-        border: '#30363d',
-        divider: '#30363d',
-        text: '#e6edf3',
-        muted: '#7d8590',
-        hover: 'rgba(177, 186, 196, 0.12)',
-        inputBg: '#0d1117',
-        inputBorder: '#30363d',
-        focusRing: '#1f6feb'
-      }
-    : {
-        bg: '#ffffff',
-        border: '#d0d7de',
-        divider: '#d8dee4',
-        text: '#1f2328',
-        muted: '#59636e',
-        hover: 'rgba(208, 215, 222, 0.32)',
-        inputBg: '#ffffff',
-        inputBorder: '#d0d7de',
-        focusRing: '#0969da'
-      };
-}
+// ensureBaseBranchFilterButton() below is just the orchestrator. All theming
+// is done via CSS (see _variables.scss and CLAUDE.md's "Matching GitHub's
+// Primer UI" section) — no JS theme detection here.
 
 function buildFilterButton() {
   const button = document.createElement('button');
@@ -98,7 +66,11 @@ function buildFilterPopoverHeader(onClose) {
   const closeBtn = document.createElement('button');
   closeBtn.type = 'button';
   closeBtn.className = 'base-branch-filter-close';
-  closeBtn.textContent = '✕';
+  // GitHub's own SelectMenu close button uses the "x" Octicon (16x16), not a
+  // text glyph — a Unicode "✕" renders with a different weight/position
+  // depending on the OS font, so we match the actual icon instead.
+  closeBtn.innerHTML =
+    '<svg aria-hidden="true" viewBox="0 0 16 16" width="16" height="16"><path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"></path></svg>';
   closeBtn.setAttribute('aria-label', i18nText(uiLanguage, 'closeAriaLabel'));
   closeBtn.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -160,10 +132,6 @@ function buildBranchRow(branch, selected) {
 function renderFilterPopoverContent(popover, onClose) {
   popover.innerHTML = '';
   popover.appendChild(buildFilterPopoverHeader(onClose));
-
-  const divider = document.createElement('div');
-  divider.className = 'base-branch-filter-divider';
-  popover.appendChild(divider);
 
   const allBranches = Array.from(
     new Set([...Object.keys(branchColors).filter((k) => k !== 'default'), ...discoveredBranches])
@@ -234,20 +202,8 @@ export function ensureBaseBranchFilterButton() {
 
   if (filterHeader.querySelector('.base-branch-filter-btn')) return;
 
-  const colors = getFilterPopoverColors(isDarkMode());
-
   const wrapper = document.createElement('div');
   wrapper.className = 'base-branch-filter-btn';
-  wrapper.style.setProperty('--fb-text', colors.text);
-  wrapper.style.setProperty('--fb-hover', colors.hover);
-  wrapper.style.setProperty('--fb-bg', colors.bg);
-  wrapper.style.setProperty('--fb-border', colors.border);
-  wrapper.style.setProperty('--fb-divider', colors.divider);
-  wrapper.style.setProperty('--fb-muted', colors.muted);
-  wrapper.style.setProperty('--fb-input-bg', colors.inputBg);
-  wrapper.style.setProperty('--fb-input-border', colors.inputBorder);
-  wrapper.style.setProperty('--fb-focus-ring', colors.focusRing);
-  wrapper.style.setProperty('--fb-focus-ring-alpha', `${colors.focusRing}33`);
 
   const button = buildFilterButton();
   const popover = buildFilterPopover();

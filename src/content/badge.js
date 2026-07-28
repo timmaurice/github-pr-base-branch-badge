@@ -20,7 +20,6 @@ export async function setupPRBadges() {
   const prRows = document.querySelectorAll('.Box-row');
 
   for (const prRow of prRows) {
-    // Skip if already has badge
     if (prRow.querySelector('.base-branch-badge')) {
       continue;
     }
@@ -30,14 +29,12 @@ export async function setupPRBadges() {
 
     const prUrl = prLink.getAttribute('href');
 
-    // Skip if already processed
     if (processedPRs.has(prUrl)) {
       continue;
     }
 
     processedPRs.add(prUrl);
 
-    // Check cache first
     if (branchCache.has(prUrl)) {
       const baseBranch = branchCache.get(prUrl);
       addBaseBranchBadge(prRow, prLink, baseBranch);
@@ -58,7 +55,6 @@ function parsePRUrl(prUrl) {
 
 async function fetchAndExtractBaseBranch(prUrl, prRow, prLink) {
   try {
-    // Check storage cache first
     const cachedBranch = await getCachedBranch(prUrl);
     if (cachedBranch) {
       addBaseBranchBadge(prRow, prLink, cachedBranch);
@@ -134,9 +130,7 @@ async function fetchAndExtractBaseBranch(prUrl, prRow, prLink) {
     const baseBranch = data.base && data.base.ref;
 
     if (baseBranch) {
-      // Cache in memory
       branchCache.set(prUrl, baseBranch);
-      // Cache in storage (async, no await needed)
       setCachedBranch(prUrl, baseBranch);
       addBaseBranchBadge(prRow, prLink, baseBranch);
     } else {
@@ -153,12 +147,10 @@ async function fetchAndExtractBaseBranch(prUrl, prRow, prLink) {
 }
 
 function addBaseBranchBadge(prRow, prLink, baseBranch) {
-  // Double-check not already added
   if (prRow.querySelector('.base-branch-badge')) {
     return;
   }
 
-  // Sanitize branch name
   baseBranch = baseBranch.trim().split(/\s+/)[0];
 
   if (!baseBranch || baseBranch.length < 2) {
@@ -167,10 +159,8 @@ function addBaseBranchBadge(prRow, prLink, baseBranch) {
 
   rememberDiscoveredBranch(baseBranch);
 
-  // Get color for this branch (exact name, then `*`-wildcard patterns, then default)
   const bgColor = resolveBranchColor(branchColors, baseBranch);
 
-  // Create badge element
   const badge = document.createElement('a');
   badge.className = 'base-branch-badge';
   // PULL_REQUEST_ICON_SVG is a trusted constant, safe as innerHTML — but
@@ -186,10 +176,8 @@ function addBaseBranchBadge(prRow, prLink, baseBranch) {
   badge.href = `?q=${encodeURIComponent(buildQueryForBaseBranches([baseBranch]))}`;
   badge.title = i18nText(uiLanguage, 'badgeTitle', { branch: baseBranch });
 
-  // Per-branch color as custom properties, not a full style.cssText block —
-  // styles.css owns the shared rules (including :hover/:active), which an
-  // inline `style` attribute would otherwise always beat, pseudo-classes
-  // included.
+  // Per-branch color as custom properties rather than a full style.cssText
+  // block, so styles.css still owns :hover/:active (see CLAUDE.md).
   badge.style.setProperty('--badge-bg', bgColor);
   badge.style.setProperty('--badge-border', adjustColor(bgColor, -20));
   badge.style.setProperty('--badge-hover-bg', adjustColor(bgColor, 20));

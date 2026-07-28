@@ -31,8 +31,6 @@ export function buildQueryForBaseBranches(branches, originalQuery) {
     return query;
   }
 
-  // GitHub treats repeated `base:` qualifiers as OR, so no grouping syntax
-  // is needed — "base:master base:beta" already matches either branch.
   const group = branches.map((b) => `base:${b}`).join(' ');
 
   if (query) {

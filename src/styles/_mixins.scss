@@ -1,6 +1,7 @@
+@use 'variables';
+
 // Shared by every hoverable/focusable control in the filter dropdown — each
-// just swaps to the theme's --fb-hover custom property (set once on
-// .base-branch-filter-btn, see filterDropdown.js) on hover/focus.
+// just swaps to GitHub's own transparent-control hover token on hover/focus.
 @mixin filter-hover-highlight {
-  background-color: var(--fb-hover);
+  background-color: variables.$gh-hover-bg;
 }

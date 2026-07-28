@@ -1,1 +1,15 @@
 $github-accent-blue: #0969da;
+
+// GitHub's own Primer CSS custom properties, read directly from the page
+// (see CLAUDE.md's "Matching GitHub's Primer UI" section for why, and for
+// the DevTools methodology behind these specific values).
+$gh-overlay-bg: var(--overlay-bgColor, var(--color-canvas-overlay));
+$gh-border-default: var(--borderColor-default, var(--color-border-default));
+$gh-border-muted: var(--borderColor-muted, var(--color-border-muted));
+$gh-overlay-shadow: var(--shadow-floating-legacy, var(--color-overlay-shadow));
+$gh-fg-default: var(--fgColor-default, var(--color-fg-default));
+$gh-fg-muted: var(--fgColor-muted, var(--color-fg-muted));
+$gh-hover-bg: var(--control-transparent-bgColor-hover, var(--color-neutral-muted));
+$gh-input-bg: $gh-overlay-bg;
+$gh-input-border: $gh-border-default;
+$gh-focus-ring: var(--fgColor-accent, var(--color-accent-fg));

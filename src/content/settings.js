@@ -1,7 +1,6 @@
 import { i18nReady, I18N_DEFAULT_LANG } from '../shared/i18n.js';
 import { setBranchColors, setGithubToken, setUiLanguage } from './state.js';
 
-// Load colors from storage
 export function loadColorSettings(callback) {
   chrome.storage.local.get('branchColors', (result) => {
     if (result.branchColors) {

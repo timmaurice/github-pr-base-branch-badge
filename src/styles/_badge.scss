@@ -1,9 +1,7 @@
-// --badge-bg/--badge-border/--badge-hover-bg are set per-element by
-// badge.js from the user's per-branch color; everything else here is
-// shared/static. Colors used to be set via a full inline style.cssText
-// block, which put them in the `style` attribute — that always wins over
-// any stylesheet rule, :hover included, which is why hover used to need a
-// mouseenter/mouseleave listener instead of just working.
+// --badge-bg/--badge-border/--badge-hover-bg are set per-element by badge.js
+// from the user's per-branch color; everything else here is shared/static
+// (see CLAUDE.md's "Branch colors" section for why colors are custom
+// properties rather than a full inline style block).
 .base-branch-badge {
   display: inline-flex;
   align-items: center;

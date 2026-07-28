@@ -2,14 +2,6 @@ export function isPRListPage() {
   return /\/pulls\/?$/.test(window.location.pathname);
 }
 
-export function isDarkMode() {
-  return (
-    document.documentElement.getAttribute('data-color-mode') === 'dark' ||
-    document.body.classList.contains('dark') ||
-    window.matchMedia('(prefers-color-scheme: dark)').matches
-  );
-}
-
 // Utility: adjust color brightness
 export function adjustColor(color, amount) {
   const c = parseInt(color.substring(1), 16);

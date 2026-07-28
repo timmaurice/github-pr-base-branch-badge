@@ -28,8 +28,6 @@
   "addBranchBtn": "+ Add branch",
   "defaultRowLabel": "Default",
   "defaultRowTitle": "Fallback color for all unconfigured branches",
-  "previewDefaultText": "other",
-  "previewPlaceholder": "branch",
   "namePlaceholder": "branch-name",
   "namePatternHint": "Exact branch name, or a pattern with * as a wildcard (e.g. \"release/*\" matches \"release/1.0\"). An exact match always wins; among several matching patterns, the topmost one wins — drag rows to reorder.",
   "dragHandleTitle": "Drag to reorder (higher = wins ties between matching patterns)",

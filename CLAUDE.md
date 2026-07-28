@@ -18,7 +18,7 @@ A Chrome Manifest V3 extension that shows the base (target) branch of each PR in
 6. After editing `src/popup.js`/`popup.html`, rebuild and just reopen the popup — no extension reload needed unless `src/content/**`/`src/background.js`/`manifest.json` changed.
 7. After editing anything under `src/content/` or `src/styles/`, rebuild, then do a full reload of the extension AND the GitHub tab.
 
-`npm run lint` (ESLint, flat config in `eslint.config.cjs`), `npm run format` / `format:check` (Prettier — also formats `src/styles/**/*.scss` natively), and `npm test` (Node's built-in test runner, `node --test`, zero extra dependencies — covers the pure logic in `src/content/query.js`, `src/content/utils.js`, `src/shared/i18n.js`) all cover `src/**` and the repo's own tooling files; `dist/` is excluded from both lint and format (it's build output, not hand-written) and CI (`.github/workflows/ci.yml`) runs all of the above plus a plain `npm run build` to prove `src/` still compiles.
+`npm run lint` (ESLint, flat config in `eslint.config.cjs`), `npm run format` / `format:check` (Prettier — also formats `src/styles/**/*.scss` natively), and `npm test` (Node's built-in test runner, `node --test`, zero extra dependencies — covers the pure logic in `src/content/query.js`, `src/content/utils.js`, `src/shared/i18n.js`, `src/content/state.js`, `src/content/storageCache.js`, and `src/background.js`'s message handlers by mocking the `chrome.*`/`fetch` globals; `src/content/badge.js` and `src/content/filterDropdown.js` are DOM-heavy and untested, since covering them would require adding a DOM library like jsdom as a dependency) all cover `src/**` and the repo's own tooling files; `dist/` is excluded from both lint and format (it's build output, not hand-written) and CI (`.github/workflows/ci.yml`) runs all of the above plus a plain `npm run build` to prove `src/` still compiles.
 
 ## Architecture
 
@@ -48,6 +48,13 @@ Failed PR lookups are handled by error type: GitHub's secondary rate limit and n
 ### Branch colors
 
 `popup.js` manages a `branchColors` map (`chrome.storage.local`), keyed by arbitrary branch name (rename/add/remove supported) plus a `default` fallback color. `content.js` looks up colors generically by name and falls back to `default`. Saving in the popup broadcasts a `reloadBadges` message to all open `github.com` tabs; `content.js` removes existing badge DOM (colors are baked in per-element as CSS custom properties set once at creation, so elements must be rebuilt, not just restyled) and redraws from the in-memory `branchCache` — no network re-fetch.
+
+### Matching GitHub's Primer UI
+
+The filter dropdown (`src/content/filterDropdown.js`, `src/styles/_filter-dropdown.scss`/`_variables.scss`/`_mixins.scss`) is styled to match GitHub's own Primer `.SelectMenu-*` components (e.g. "Filter by label"). Two hard-won lessons from getting this right:
+
+- **Reference GitHub's own CSS custom properties, don't hardcode hex per light/dark theme.** All theme-dependent colors (background, border, text, hover, focus ring — see `_variables.scss`'s `$gh-*` tokens) are `var(--primer-token, var(--fallback-token))` chains read from the page, not guessed hex values. An earlier version used a JS `isDarkMode()` heuristic (`prefers-color-scheme` + a couple of DOM checks) to pick between two hardcoded palettes; it broke whenever the OS theme disagreed with GitHub's own explicitly-set theme (e.g. OS dark + GitHub set to light), because the heuristic and GitHub's actual rendered theme are two independent things. Removing the heuristic entirely and binding every color to GitHub's own custom properties removed that whole class of bug — don't reintroduce JS-based theme detection here.
+- **Get exact values from DevTools' Computed panel, don't estimate.** Primer's base `.SelectMenu-*` rules are frequently overridden by a `@media (min-width: 544px)` block with tighter, desktop-specific values (visible as strikethrough in DevTools' Computed/Styles panel on the base rule) — e.g. `.SelectMenu-header`'s base `padding: 16px` is overridden to `7px 7px 7px 16px` at desktop widths, and `.SelectMenu-closeButton`'s base `padding/margin: 16px`/`-16px` become `8px`/`-8px -7px`. Guessing at "roughly matching" values (or applying a base-rule value that's actually overridden) reliably produces a popover that's subtly but noticeably off — always pull the real computed value for the specific breakpoint being matched.
 
 ### Multi-branch filtering
 
