@@ -5,6 +5,23 @@ const LOCALE_FILES = {
   de: 'locales/de.json'
 };
 
+// Best-effort sweep for branch_<prUrl> entries nobody's revisited (see
+// CLAUDE.md) — getCachedBranch only expires an entry lazily, on lookup.
+function pruneExpiredBranchCache() {
+  chrome.storage.local.get(null, (all) => {
+    const now = Date.now();
+    const expiredKeys = Object.keys(all).filter((key) => {
+      if (!key.startsWith('branch_')) return false;
+      const entry = all[key];
+      return !entry || !entry.timestamp || now - entry.timestamp >= CACHE_TTL;
+    });
+    if (expiredKeys.length > 0) chrome.storage.local.remove(expiredKeys);
+  });
+}
+
+chrome.runtime.onInstalled.addListener(pruneExpiredBranchCache);
+chrome.runtime.onStartup.addListener(pruneExpiredBranchCache);
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'getLocaleDict') {
     // Fetched here rather than in content.js: content scripts inherit the

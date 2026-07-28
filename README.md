@@ -106,6 +106,7 @@ Setting a token also switches lookups from one REST request per PR to a single b
 - `discoveredBranches` only grows on its own — the popup can dismiss individual suggestions or clear all of them, but nothing does this automatically
 - "Scan branches" looks at up to 1,000 of the repo's most recent PRs (open and closed) to find target branches — a repo with more PR history than that may have older/rarer target branches it doesn't surface
 - Branch colors and discovered branches are tied to a repo's `owner/repo` URL path — renaming or transferring a repo means starting over with a fresh (template-seeded) config, not carrying the old one forward
+- Chrome's sync storage caps out at 8KB per repo's color list and 100KB total — only a concern if you track an unusually large number of distinct repos
 - Language selection (EN/DE) only covers text rendered by the extension itself (badges, filter dropdown, popup) — not GitHub's own interface
 - `github.com` only, no GitHub Enterprise Server (own domain) — `manifest.json` would need to be extended with the corresponding domain for that
 

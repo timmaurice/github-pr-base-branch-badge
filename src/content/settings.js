@@ -2,12 +2,8 @@ import { i18nReady, I18N_DEFAULT_LANG } from '../shared/i18n.js';
 import { setBranchColors, setGithubToken, setUiLanguage } from './state.js';
 import { repoKeyFromPath } from '../shared/repoKey.js';
 
-// Colors are looked up in four tiers, most-specific first: this repo's own
-// saved colors, the shared template used to seed new repos (see popup.js
-// and CLAUDE.md's "Branch colors" section), the pre-per-repo global value
-// (sync then local, for installs that haven't opened the popup since that
-// migration landed), and finally state.js's hardcoded DEFAULT_COLORS if
-// none of those exist yet.
+// Fallback chain (repo → template → legacy global → DEFAULT_COLORS) — see
+// CLAUDE.md's "Branch colors" section.
 export function loadColorSettings(callback) {
   const repoKey = repoKeyFromPath(window.location.pathname);
   const repoStorageKey = repoKey ? `repoBranchColors:${repoKey}` : null;

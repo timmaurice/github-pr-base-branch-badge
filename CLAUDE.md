@@ -37,7 +37,7 @@ A Chrome Manifest V3 extension that shows the base (target) branch of each PR in
 
 ### How the base branch is resolved
 
-No HTML scraping — `content.js` fetches from GitHub's API and reads each PR's base branch. Two-tier cache either way: in-memory `branchCache` (per page load) backed by `background.js`'s `chrome.storage.local` cache (24h TTL, keyed `branch_<prUrl>`).
+No HTML scraping — `content.js` fetches from GitHub's API and reads each PR's base branch. Two-tier cache either way: in-memory `branchCache` (per page load) backed by `background.js`'s `chrome.storage.local` cache (24h TTL, keyed `branch_<prUrl>`). Individual entries expire lazily (only checked when that exact PR is looked up again — see `getCachedBranch`), so `background.js` also runs `pruneExpiredBranchCache()` on `chrome.runtime.onInstalled`/`onStartup` as a best-effort sweep for entries nobody's revisited (no "alarms" permission needed just for this — those two events already fire often enough via the service worker's own install/startup/wake-from-idle lifecycle).
 
 `setupPRBadges()` (`src/content/badge.js`) first resolves every row it can from that cache (memory, then storage — no network). Whatever's left over the network is split by whether a token is set:
 
@@ -83,6 +83,8 @@ The filter dropdown (`src/content/filterDropdown.js`, `src/styles/_filter-dropdo
 
 The popover also supports arrow-key navigation between branch checkboxes and Enter-to-toggle (`wireBranchListKeyboardNav()` in `filterDropdown.js`), matching GitHub's own SelectMenu; opening the button focuses the search input so keyboard-only use doesn't require an extra Tab.
 
+Click-outside/Escape dismissal is registered as a **single** pair of `document`-level listeners at module load, not per button build — `ensureBaseBranchFilterButton()` rebuilds a fresh wrapper/popover on every popup Save and on some Turbo navigations, and re-registering a `document.addEventListener` each time (an earlier version did exactly this) leaks: the old listener keeps firing against an increasingly stale, detached wrapper forever, since nothing ever removes it. The two listeners instead read a module-level `currentDismissal` reference that `ensureBaseBranchFilterButton()` updates on every (re)build.
+
 ### Per-branch PR counts
 
 Each row in the filter dropdown shows the branch's current open/closed PR count (e.g. "master (12)"), fetched via one batched GraphQL request per popover open (`fetchBranchCounts()` in `filterDropdown.js`) — aliased `b0: search(query: "repo:owner/repo is:pr is:open base:branch", type: ISSUE, first: 1) { issueCount }` fields, one per branch, same batching rationale as the base-branch lookups above. `search(...).issueCount` is an exact total across the whole repo, not just PRs this session has scanned/badged so far. `first: 1` is required by GitHub's schema for a connection field but costs nothing extra here since the query never selects `nodes`. Open vs. closed is read from the current URL via `query.js`'s `isClosedQuery()` (shared with `buildQueryForBaseBranches()`), so counts match whatever state the list is actually showing. Like the base-branch batching, this only runs with a token (GraphQL requires auth) — silently shows no counts otherwise, rather than falling back to something that would look precise but wouldn't be (e.g. counting only already-scanned PRs). No caching: every popover open re-fetches, which is fine at this scale (a handful of `search` resolvers per open is negligible against a 5000/hour GraphQL budget).
@@ -101,6 +103,8 @@ Popup has an EN/DE language selector (`uiLanguage` in `chrome.storage.sync`, def
 
 GitHub navigates between `/issues` and `/pulls` via Turbo (Hotwire) — a History API URL change with no real page load, so the content script isn't re-injected and `popstate` doesn't fire. `content.js` listens for `turbo:load` (fires on every Turbo visit, including soft nav) to rebuild badges/dropdown, and re-attaches its `MutationObserver` to `document.body` on every navigation since GitHub sometimes replaces `<body>` wholesale, silently detaching an observer bound to the old element. `pjax:end` is kept as a harmless fallback for any pages still on old pjax.
 
+Turbo isn't scoped to one repo — following a link to a _different_ repo (e.g. one mentioned in a PR) can also Turbo-navigate without a real page load. Since branch colors and `discoveredBranches` are per-repo (see "Branch colors" above), `handleNavigation()` calls `loadColorSettings()` and `resyncDiscoveredBranches()` before redrawing, re-resolving both for whatever repo the URL now points to — without this, badges/the filter dropdown would keep showing the _previous_ repo's colors and branches until a manual popup Save or a hard reload.
+
 Filter changes (checkbox toggle, badge click) trigger a real page reload via `window.location.search`, not a Turbo soft nav — confirmed by observation, not just a design choice.
 
 ## Known limitations (see README for full list)
@@ -110,4 +114,5 @@ Filter changes (checkbox toggle, badge click) trigger a real page reload via `wi
 - Branch name matching is case-sensitive, exact match to GitHub's name.
 - `discoveredBranches` only grows automatically; the popup's prune UI only covers uncolored branches one at a time, no bulk "remove just the stale ones".
 - Branch colors and discovered branches are keyed by `owner/repo` from the URL — a renamed/transferred repo (different URL) starts with no config of its own; it isn't migrated from the old path.
+- `chrome.storage.sync` has an 8KB-per-item / 100KB-total quota; each `repoBranchColors:<owner>/<repo>` entry is one item, so tracking an unusually large number of distinct repos (hundreds) could approach the total before any single repo's color list gets close to the per-item cap.
 - `github.com` only — no GitHub Enterprise Server support (would need a `manifest.json` host addition).

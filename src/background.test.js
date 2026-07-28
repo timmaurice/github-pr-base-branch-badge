@@ -6,11 +6,25 @@ import assert from 'node:assert/strict';
 // must exist *before* that import runs, so the mock is set up first and the
 // listener is captured via addListener rather than importing named exports.
 const listeners = [];
+const lifecycleListeners = { onInstalled: [], onStartup: [] };
 globalThis.chrome = {
   runtime: {
     onMessage: {
       addListener(fn) {
         listeners.push(fn);
+      }
+    },
+    // background.js also registers pruneExpiredBranchCache() against these
+    // on import — captured the same way as onMessage so a test can trigger
+    // it explicitly instead of only covering the message-handling path.
+    onInstalled: {
+      addListener(fn) {
+        lifecycleListeners.onInstalled.push(fn);
+      }
+    },
+    onStartup: {
+      addListener(fn) {
+        lifecycleListeners.onStartup.push(fn);
       }
     },
     getURL(path) {
@@ -21,6 +35,7 @@ globalThis.chrome = {
 
 await import('./background.js');
 const [handleMessage] = listeners;
+const [pruneOnInstalled] = lifecycleListeners.onInstalled;
 
 // Every recognized action returns `true` from the listener to keep the
 // sendResponse channel open for its async work; this helper asserts that
@@ -134,6 +149,46 @@ test('setCachedBranch stores the branch under branch_<prUrl> with a fresh timest
   assert.deepEqual(response, { success: true });
   assert.equal(stored['branch_/o/r/pull/1'].branch, 'develop');
   assert.ok(stored['branch_/o/r/pull/1'].timestamp >= before);
+});
+
+test('pruneExpiredBranchCache removes only expired branch_ entries', () => {
+  const now = Date.now();
+  let removedKeys;
+  globalThis.chrome.storage = {
+    local: {
+      get(key, callback) {
+        assert.equal(key, null);
+        callback({
+          'branch_/o/r/pull/1': { branch: 'main', timestamp: now - 1000 }, // fresh
+          'branch_/o/r/pull/2': { branch: 'develop', timestamp: now - 25 * 60 * 60 * 1000 }, // expired
+          'branch_/o/r/pull/3': {}, // missing timestamp — treated as expired
+          uiLanguage: 'en' // unrelated key, must be left alone
+        });
+      },
+      remove(keys) {
+        removedKeys = keys;
+      }
+    }
+  };
+
+  pruneOnInstalled();
+
+  assert.deepEqual([...removedKeys].sort(), ['branch_/o/r/pull/2', 'branch_/o/r/pull/3'].sort());
+});
+
+test('pruneExpiredBranchCache does not call remove when nothing is expired', () => {
+  globalThis.chrome.storage = {
+    local: {
+      get(key, callback) {
+        callback({ 'branch_/o/r/pull/1': { branch: 'main', timestamp: Date.now() } });
+      },
+      remove() {
+        assert.fail('should not remove any entry when nothing is expired');
+      }
+    }
+  };
+
+  pruneOnInstalled();
 });
 
 test('an unrecognized action is ignored without a response', () => {

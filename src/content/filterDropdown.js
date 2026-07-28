@@ -301,17 +301,21 @@ function wireFilterDropdownToggle(button, popover, closePopover) {
   });
 }
 
-function wireFilterDropdownDismissal(wrapper, closePopover) {
-  document.addEventListener('click', (e) => {
-    if (!wrapper.contains(e.target)) {
-      closePopover();
-    }
-  });
+// Single document-level dismissal listener pair, not one per rebuild (see
+// CLAUDE.md's "Matching GitHub's Primer UI" section — re-registering on
+// every rebuild used to leak). Reads whichever wrapper/closePopover is
+// current via this ref, updated by ensureBaseBranchFilterButton() below.
+let currentDismissal = null;
 
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closePopover();
-  });
-}
+document.addEventListener('click', (e) => {
+  if (currentDismissal && !currentDismissal.wrapper.contains(e.target)) {
+    currentDismissal.closePopover();
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && currentDismissal) currentDismissal.closePopover();
+});
 
 export function ensureBaseBranchFilterButton() {
   if (!isPRListPage()) return;
@@ -336,7 +340,7 @@ export function ensureBaseBranchFilterButton() {
   }
 
   wireFilterDropdownToggle(button, popover, closePopover);
-  wireFilterDropdownDismissal(wrapper, closePopover);
+  currentDismissal = { wrapper, closePopover };
 
   wrapper.appendChild(button);
   wrapper.appendChild(popover);

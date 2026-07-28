@@ -1,10 +1,8 @@
 import { I18N_DEFAULT_LANG, i18nReady, i18nText } from './shared/i18n.js';
 import { repoKeyFromPath } from './shared/repoKey.js';
 
-// Storage key for the repo currently being edited (see resolveActiveRepoKey
-// and CLAUDE.md's "Branch colors" section); REPO_TEMPLATE_KEY is both the
-// seed copied into a repo the first time it's opened here, and the fallback
-// "no repo" edit target when no GitHub tab/last-active-repo is known at all.
+// See CLAUDE.md's "Branch colors" section for the full per-repo storage
+// scheme (REPO_TEMPLATE_KEY, migration, resolveActiveRepoKey fallback chain).
 function repoStorageKey(repoKey) {
   return `repoBranchColors:${repoKey}`;
 }
@@ -18,13 +16,9 @@ const DEFAULT_COLORS = {
   default: '#6b7280'
 };
 
-// What a genuinely brand-new repo (no template, no legacy global colors to
-// migrate — see loadSettings()) starts with: just the fallback color, no
-// guessed example branches. Real branch names now come from suggestions
-// (discovered/scanned branches — see renderDiscoveredBranches()/
-// scanBranches()) instead of a fixed list that usually doesn't match the
-// repo's actual branches (visible once PR counts showed "(0)" next to
-// invented names like "develop"/"staging" on repos that don't have them).
+// A brand-new repo's seed: just the fallback color, no guessed example
+// branches (see CLAUDE.md's "Branch colors" for why) — real names come from
+// suggestions instead (renderDiscoveredBranches()/scanBranches() below).
 const EMPTY_SEED_COLORS = { default: DEFAULT_COLORS.default };
 
 const NEW_BRANCH_PALETTE = ['#8b5cf6', '#06b6d4', '#ec4899', '#84cc16', '#f59e0b', '#14b8a6'];
@@ -122,13 +116,9 @@ function currentRowNames() {
   );
 }
 
-// Only branches with no row yet are shown here, as suggestions pulled from
-// real branch names (badges seen so far, or "Scan branches" below) — colored
-// ones stay in the filter dropdown regardless of `discoveredBranches` (see
-// filterDropdown.js), so suggesting them again would just be confusing.
-// The header (title + scan button) stays visible even with zero
-// suggestions, whenever a repo is active — scanning is most useful exactly
-// when nothing's been discovered yet.
+// Suggestions: branches with no row yet (see CLAUDE.md's "Branch colors").
+// The header (title + scan button) stays visible with zero suggestions too,
+// whenever a repo is active — scanning is most useful exactly then.
 function renderDiscoveredBranches() {
   const coloredNames = currentRowNames();
   const extras = currentRepoKey
@@ -180,15 +170,10 @@ function removeDiscoveredBranch(branch) {
 
 const SCAN_BRANCHES_MAX_PAGES = 10; // 1000 PRs at 100/page — plenty for any real repo
 
-// Fetches the *distinct base branches actually targeted by PRs* (state=all,
-// so closed PRs count too — not just currently-open ones), not every git
-// branch in the repo. An earlier version hit GitHub's plain /branches
-// endpoint instead, which pulled in every feature/personal/stale branch
-// that was never a PR target — exactly the noise this list exists to avoid.
-// Follows the Link header for pagination, capped at SCAN_BRANCHES_MAX_PAGES
-// so a repo with an unusual number of PRs can't turn this into a runaway
-// loop; `truncated` tells the caller whether the cap was actually hit (in
-// which case some older/rarer base branches may not have been seen yet).
+// Distinct base branches actually targeted by PRs (state=all), not every git
+// branch in the repo — see CLAUDE.md's "Branch colors" for why. Paginates
+// via the Link header, capped at SCAN_BRANCHES_MAX_PAGES; `truncated` tells
+// the caller whether the cap was hit.
 async function fetchRecentBaseBranches(repoKey, token) {
   const [owner, repo] = repoKey.split('/');
   const headers = { Accept: 'application/vnd.github+json' };
@@ -320,13 +305,8 @@ function showTokenResult(message, type) {
   tokenTestResult.className = `token-test-result ${type}`;
 }
 
-// Which repo's config the popup edits: the active GitHub tab's repo (if
-// it's a PR/issues page — see repoKeyFromPath), else whichever repo was
-// last edited here, else null (edits the shared template instead — see
-// REPO_TEMPLATE_KEY). Reading the active tab's URL needs no extra
-// permission beyond the "https://github.com/*" host permission we already
-// have for content scripts/API calls (host permission alone is enough for
-// chrome.tabs to expose a matching tab's url).
+// Which repo's config the popup edits — see CLAUDE.md's "Branch colors" for
+// the fallback chain (active tab → last-edited repo → template).
 function resolveActiveRepoKey(callback) {
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     const tab = tabs && tabs[0];
@@ -347,11 +327,8 @@ function loadSettings() {
     const colorsKey = repoKey ? repoStorageKey(repoKey) : REPO_TEMPLATE_KEY;
     const discoveredKey = repoKey ? `discoveredBranches:${repoKey}` : null;
 
-    // branchColors/uiLanguage live in storage.sync (so they follow the user
-    // across machines); githubToken and discoveredBranches stay local-only —
-    // the token for security (never want it round-tripping through a Google
-    // account), discoveredBranches because it's a large, ever-growing cache
-    // that isn't worth the sync quota (see CLAUDE.md).
+    // See CLAUDE.md's "Branch colors" for why colors/language are sync but
+    // token/discoveredBranches stay local.
     chrome.storage.local.get(
       ['githubToken', discoveredKey, 'branchColors', 'uiLanguage'].filter(Boolean),
       (localResult) => {

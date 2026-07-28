@@ -95,10 +95,18 @@ function handleNavigation({ clearBranchCache }) {
   processedPRs.clear();
   if (clearBranchCache) branchCache.clear();
   attachBodyObserver();
-  setTimeout(() => {
-    setupPRBadges();
-    refreshFilterUI();
-  }, 150);
+
+  // Re-resolve colors/discovered branches for whatever repo the URL now
+  // points to — Turbo can navigate cross-repo too (see CLAUDE.md's "Turbo
+  // navigation" section).
+  loadColorSettings(() => {
+    resyncDiscoveredBranches(() => {
+      setTimeout(() => {
+        setupPRBadges();
+        refreshFilterUI();
+      }, 150);
+    });
+  });
 }
 
 // GitHub navigates between /issues and /pulls via Turbo (Hotwire): the URL
