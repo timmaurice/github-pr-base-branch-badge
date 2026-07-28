@@ -1,0 +1,14 @@
+{
+  "extName": {
+    "message": "GitHub PR Base Branch Badge",
+    "description": "Extension name shown in chrome://extensions and the Chrome Web Store listing"
+  },
+  "extDescription": {
+    "message": "Shows base branch of PRs in GitHub list view with click-to-filter functionality",
+    "description": "Extension description shown in chrome://extensions and the Chrome Web Store listing"
+  },
+  "extActionTitle": {
+    "message": "GitHub PR Base Branch Badge - Settings",
+    "description": "Tooltip shown when hovering the toolbar icon"
+  }
+}

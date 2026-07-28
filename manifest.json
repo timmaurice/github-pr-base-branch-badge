@@ -1,8 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "GitHub PR Base Branch Badge",
+  "default_locale": "en",
+  "name": "__MSG_extName__",
   "version": "1.2.0",
-  "description": "Shows base branch of PRs in GitHub list view with click-to-filter functionality",
+  "description": "__MSG_extDescription__",
+  "homepage_url": "https://github.com/timmaurice/github-pr-base-branch-badge",
   "icons": {
     "16": "icon16.png",
     "48": "icon48.png",
@@ -14,7 +16,7 @@
       "48": "icon48.png",
       "128": "icon128.png"
     },
-    "default_title": "GitHub PR Base Branch Badge - Settings",
+    "default_title": "__MSG_extActionTitle__",
     "default_popup": "popup.html"
   },
   "permissions": ["storage"],
@@ -27,7 +29,7 @@
       "matches": ["https://github.com/*"],
       "js": ["dist/content.js"],
       "css": ["dist/styles.css"],
-      "run_at": "document_end"
+      "run_at": "document_idle"
     }
   ]
 }

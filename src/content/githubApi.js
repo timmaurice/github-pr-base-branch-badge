@@ -1,4 +1,4 @@
-export const GRAPHQL_URL = 'https://api.github.com/graphql';
+const GRAPHQL_URL = 'https://api.github.com/graphql';
 
 // Shared by badge.js (batched base-branch lookups) and filterDropdown.js
 // (batched per-branch PR counts) — both need the same POST-with-token

@@ -317,7 +317,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && currentDismissal) currentDismissal.closePopover();
 });
 
-export function ensureBaseBranchFilterButton() {
+function ensureBaseBranchFilterButton() {
   if (!isPRListPage()) return;
 
   const authorButton = document.querySelector('#author-select-menu');
