@@ -16,6 +16,7 @@ A Chrome extension that shows the base (target) branch of pull requests in GitHu
 - ✅ **Persistent Caching** - Base branch (24h TTL) and once-seen branch names are cached in `chrome.storage.local`
 - ✅ **Batched Lookups** - With a token set, all of a page's not-yet-cached PRs are fetched in a single GraphQL request instead of one per PR (falls back to one-request-per-PR if that fails, or if no token is set)
 - ✅ **Per-Branch PR Counts** - With a token set, the filter dropdown shows each branch's current open (or closed) PR count next to its name
+- ✅ **Branch Suggestions** - The popup suggests real branch names as clickable chips (from badges seen so far, or an on-demand "Scan branches" button) instead of guessed example branches, so you only ever color branches that actually exist
 - ✅ **Dark Mode Support** - Automatically adapts to the OS color scheme
 - ✅ **Turbo-/Infinite-Scroll-Proof** - Works even with dynamically loaded-in PRs and when switching between the Issues/Pulls tabs, without a full page reload
 - ✅ **Automatic Retry** - Transient errors (GitHub's secondary rate limit, network errors) are automatically retried on the next scan (e.g. scrolling) instead of leaving the row without a badge permanently
@@ -35,18 +36,18 @@ No Node/npm required — just download and load the extension:
 
 1. A colored badge with a PR icon and branch name appears next to every PR
 2. **Clicking a badge** filters the list by exactly that base branch
-3. **"Base Branch ▾"** opens a dropdown with checkboxes for all known branches — several can be checked at once, the selection applies immediately; the number on the button shows the count of active filters
+3. **"Base Branch ▾"** opens a dropdown with checkboxes for all known branches — several can be checked at once, the selection applies immediately; the number on the button shows the count of active filters, and (with a token set) each branch shows its current PR count
 4. **Clicking the extension icon** opens the settings popup: change colors, add/rename/remove branches, set/test a token, switch language (EN/DE, applies immediately), click a suggested branch to add it with a color (or dismiss/reset suggestions), save
 
 The popup always shows which repo's colors you're editing (a small line under the header) — it follows whichever GitHub PR/issues tab is currently active, or the repo you last edited if the active tab isn't a GitHub repo page.
 
-<img src="screenshots/filter-dropdown.png" alt="The &quot;Filter by target branch&quot; dropdown open, with a checkbox and color dot per known branch" width="350">
+<img src="screenshots/filter-dropdown.png" alt="The &quot;Filter by target branch&quot; dropdown open, with a checkbox, color dot, and current PR count per known branch" width="350">
 
 ### Branch suggestions
 
 The first time you open the popup for a given repo, it only has the `default` fallback color — no guessed example branches, since a repo's actual branches vary too much for that to be useful. Instead, the popup suggests **real** branch names as chips under "Discovered branches": clicking one instantly adds it as a colored row (✕ dismisses it instead). Branches show up here automatically as PRs get badged, or immediately via the **"Scan branches"** button, which looks at the repo's recent PRs (open and closed) and suggests exactly the branches they target — not every git branch in the repo, most of which are never a PR's target and would just be noise.
 
-<img src="screenshots/popup-settings.png" alt="The settings popup, listing branch entries (develop, feat/*, main, release/*) each with a drag handle, color swatch, hex input and live preview, plus the Default fallback row and Save/Reset buttons" width="400">
+<img src="screenshots/popup-settings.png" alt="The settings popup showing which repo is being edited (home-assistant/core), branch entries (dev, master, rc) each with a drag handle, color swatch, hex input and remove button, the Default fallback row, a &quot;Discovered branches&quot; section with a &quot;Scan branches&quot; button, and Save/Reset buttons" width="400">
 
 ### Wildcard patterns and priority
 
@@ -54,7 +55,7 @@ A branch entry's name can be a `*`-wildcard pattern instead of an exact name (e.
 
 ### Per-repo colors
 
-Every repo has its own independent color list — editing one repo's branches in the popup never changes another repo's. If you haven't opened the popup for a given repo yet, badges there fall back to whatever your very first configured repo's list looked like (the "template" for new repos), so you're never left with unstyled badges on a repo you haven't gotten to yet.
+Every repo has its own independent color list — editing one repo's branches in the popup never changes another repo's. If you haven't opened the popup for a given repo yet, badges there fall back to a shared "template" (just the `default` fallback color, unless you're upgrading from before per-repo colors existed, in which case your old single list becomes that template) — so you're never left with unstyled badges on a repo you haven't gotten to yet.
 
 ### Using it on private repos / raising the rate limit
 
