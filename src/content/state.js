@@ -55,3 +55,15 @@ export function rememberDiscoveredBranch(branch) {
   discoveredBranches.add(branch);
   chrome.storage.local.set({ discoveredBranches: Array.from(discoveredBranches) });
 }
+
+// Re-syncs the in-memory set with what's actually persisted, dropping any
+// name no longer there — unlike loadDiscoveredBranches() (merge-only, used
+// once at page load), this is for the popup's per-branch prune UI, where a
+// removal must actually disappear from the open tab's filter dropdown.
+export function resyncDiscoveredBranches(callback) {
+  chrome.storage.local.get('discoveredBranches', (result) => {
+    discoveredBranches.clear();
+    (result.discoveredBranches || []).forEach((b) => discoveredBranches.add(b));
+    if (callback) callback();
+  });
+}

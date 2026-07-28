@@ -367,6 +367,55 @@
         font-weight: 500;
       }
 
+      .discovered-section {
+        padding: 0 16px 10px;
+      }
+
+      .discovered-title {
+        font-size: 11px;
+        font-weight: 600;
+        color: #6b7280;
+        margin-bottom: 6px;
+      }
+
+      .discovered-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .discovered-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 3px 4px 3px 8px;
+        border-radius: 999px;
+        background: #f3f4f6;
+        color: #374151;
+        font-size: 11px;
+      }
+
+      .discovered-chip-remove {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 16px;
+        height: 16px;
+        padding: 0;
+        border: none;
+        border-radius: 50%;
+        background: transparent;
+        color: #9ca3af;
+        font-size: 11px;
+        line-height: 1;
+        cursor: pointer;
+      }
+
+      .discovered-chip-remove:hover {
+        background: #fee2e2;
+        color: #ef4444;
+      }
+
       .clear-discovered-row {
         padding: 0 16px 10px;
         text-align: center;
@@ -400,6 +449,13 @@
 
       .token-toggle-btn:hover {
         background: #e5e7eb;
+      }
+
+      .version-footer {
+        padding: 6px 16px 10px;
+        text-align: center;
+        font-size: 10px;
+        color: #9ca3af;
       }
 
       @media (prefers-color-scheme: dark) {
@@ -530,6 +586,28 @@
         .clear-discovered-btn:hover {
           color: #f87171;
         }
+
+        .discovered-title {
+          color: #9ca3af;
+        }
+
+        .discovered-chip {
+          background: #374151;
+          color: #f3f4f6;
+        }
+
+        .discovered-chip-remove {
+          color: #9ca3af;
+        }
+
+        .discovered-chip-remove:hover {
+          background: #450a0a;
+          color: #f87171;
+        }
+
+        .version-footer {
+          color: #6b7280;
+        }
       }
     </style>
   </head>
@@ -563,6 +641,11 @@
 
     <div class="branches" id="branches-list"></div>
 
+    <div class="discovered-section" id="discovered-section">
+      <div class="discovered-title" id="discovered-title-text"></div>
+      <div class="discovered-chips" id="discovered-chips"></div>
+    </div>
+
     <div class="clear-discovered-row">
       <button type="button" id="clear-discovered-btn" class="clear-discovered-btn"></button>
     </div>
@@ -572,6 +655,7 @@
       <button id="reset-btn" class="btn btn-secondary"></button>
     </div>
     <div id="status" class="status"></div>
+    <div class="version-footer" id="version-footer"></div>
 
     <script src="dist/popup.js"></script>
   </body>

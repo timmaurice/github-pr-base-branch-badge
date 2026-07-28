@@ -42,5 +42,8 @@
 
   "clearDiscoveredBtn": "Erkannte Branches zurücksetzen",
   "clearDiscoveredConfirm": "Alle erkannten Branch-Namen löschen? Sie tauchen wieder auf, sobald PRs neu gescannt werden.",
-  "clearDiscoveredDone": "✓ Zurückgesetzt!"
+  "clearDiscoveredDone": "✓ Zurückgesetzt!",
+  "discoveredSectionTitle": "Erkannte Branches (keine Farbe gesetzt)",
+  "removeDiscoveredTitle": "Aus erkannten Branches entfernen",
+  "removeDiscoveredAriaLabel": "\"{name}\" aus erkannten Branches entfernen"
 }

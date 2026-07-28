@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { adjustColor, resolveBranchColor } from './utils.js';
+import { adjustColor, resolveBranchColor, getContrastTextColor } from './utils.js';
 
 test('adjustColor brightens each channel, clamped at 255', () => {
   assert.equal(adjustColor('#000000', 20), '#141414');
@@ -47,4 +47,14 @@ test('resolveBranchColor treats regex special characters in patterns literally',
   const colors = { 'v1.2': '#111111', default: '#6b7280' };
   assert.equal(resolveBranchColor(colors, 'v1x2'), '#6b7280');
   assert.equal(resolveBranchColor(colors, 'v1.2'), '#111111');
+});
+
+test('getContrastTextColor picks dark text on a light background', () => {
+  assert.equal(getContrastTextColor('#f0f0f0'), '#1f2937');
+  assert.equal(getContrastTextColor('#ffff00'), '#1f2937');
+});
+
+test('getContrastTextColor picks white text on a dark/saturated background', () => {
+  assert.equal(getContrastTextColor('#000000'), '#ffffff');
+  assert.equal(getContrastTextColor('#3b82f6'), '#ffffff');
 });

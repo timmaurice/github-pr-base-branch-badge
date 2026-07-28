@@ -42,5 +42,10 @@ export function buildQueryForBaseBranches(branches, originalQuery) {
 export function navigateToQuery(query) {
   const params = new URLSearchParams(window.location.search);
   params.set('q', query);
+  // A new filter changes the result count, so a `page` left over from
+  // before can point past the new last page (GitHub then just shows
+  // nothing) — drop it and let GitHub redirect to page 1, same as it does
+  // when you edit the search box directly.
+  params.delete('page');
   window.location.search = params.toString();
 }

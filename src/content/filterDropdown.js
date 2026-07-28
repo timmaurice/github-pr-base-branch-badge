@@ -123,10 +123,59 @@ function buildBranchRow(branch, selected) {
     navigateToQuery(buildQueryForBaseBranches(Array.from(current)));
   });
 
+  // Space toggles a focused checkbox natively; Enter doesn't (there's no
+  // <form> here to submit) — GitHub's own SelectMenu items respond to both,
+  // so match that instead of only supporting Space.
+  checkbox.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      checkbox.click();
+    }
+  });
+
   row.appendChild(checkbox);
   row.appendChild(dot);
   row.appendChild(label);
   return row;
+}
+
+// Only rows currently visible under the search filter are valid stops —
+// `display: none` rows (see buildBranchSearchInput) must be skipped so arrow
+// navigation doesn't get stuck moving focus onto a hidden checkbox.
+function visibleBranchRows(listContainer) {
+  return Array.from(listContainer.querySelectorAll('.base-branch-filter-row')).filter(
+    (row) => row.style.display !== 'none'
+  );
+}
+
+// Arrow-key navigation between branch checkboxes, matching GitHub's own
+// SelectMenu (which supports moving through the list without a mouse).
+function wireBranchListKeyboardNav(searchInput, listContainer) {
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowDown') return;
+    const rows = visibleBranchRows(listContainer);
+    if (rows.length === 0) return;
+    e.preventDefault();
+    rows[0].querySelector('.base-branch-filter-checkbox').focus();
+  });
+
+  listContainer.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    const rows = visibleBranchRows(listContainer);
+    const currentRow = e.target.closest('.base-branch-filter-row');
+    const currentIndex = rows.indexOf(currentRow);
+    if (currentIndex === -1) return;
+    e.preventDefault();
+
+    if (e.key === 'ArrowUp' && currentIndex === 0) {
+      searchInput.focus();
+      return;
+    }
+
+    const nextIndex = e.key === 'ArrowDown' ? currentIndex + 1 : currentIndex - 1;
+    const nextRow = rows[nextIndex];
+    if (nextRow) nextRow.querySelector('.base-branch-filter-checkbox').focus();
+  });
 }
 
 function renderFilterPopoverContent(popover, onClose) {
@@ -148,11 +197,13 @@ function renderFilterPopoverContent(popover, onClose) {
   const listContainer = document.createElement('div');
   listContainer.className = 'base-branch-filter-list';
 
+  const searchInput = buildBranchSearchInput(listContainer);
   const searchWrapper = document.createElement('div');
   searchWrapper.className = 'base-branch-filter-search-wrapper';
-  searchWrapper.appendChild(buildBranchSearchInput(listContainer));
+  searchWrapper.appendChild(searchInput);
   popover.appendChild(searchWrapper);
   popover.appendChild(listContainer);
+  wireBranchListKeyboardNav(searchInput, listContainer);
 
   const selected = new Set(getSelectedBaseBranches());
   allBranches.forEach((branch) => {
@@ -174,6 +225,11 @@ function wireFilterDropdownToggle(button, popover, closePopover) {
     if (willOpen) {
       renderFilterPopoverContent(popover, closePopover);
       popover.style.display = 'flex';
+      // Popover content is rebuilt fresh on every open, so the search input
+      // needs to be re-focused each time too — a keyboard user reaching
+      // this button expects to land somewhere useful, not nowhere.
+      const searchInput = popover.querySelector('.base-branch-filter-search');
+      if (searchInput) searchInput.focus();
     }
     button.setAttribute('aria-expanded', String(willOpen));
   });

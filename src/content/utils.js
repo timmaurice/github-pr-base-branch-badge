@@ -11,6 +11,18 @@ export function adjustColor(color, amount) {
   return '#' + [r, g, b].map((x) => x.toString(16).padStart(2, '0')).join('');
 }
 
+// Perceived-brightness (YIQ) contrast check — picks black or white text so
+// custom branch colors (some inevitably light, e.g. yellow) stay readable
+// instead of always using the hardcoded white the badge used to have.
+export function getContrastTextColor(hexColor) {
+  const c = parseInt(hexColor.substring(1), 16);
+  const r = (c >> 16) & 0xff;
+  const g = (c >> 8) & 0xff;
+  const b = c & 0xff;
+  const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+  return yiq >= 150 ? '#1f2937' : '#ffffff';
+}
+
 function wildcardToRegExp(pattern) {
   const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
   return new RegExp(`^${escaped}$`);

@@ -42,5 +42,8 @@
 
   "clearDiscoveredBtn": "Clear discovered branches",
   "clearDiscoveredConfirm": "Clear all discovered branch names? They will reappear as PRs are re-scanned.",
-  "clearDiscoveredDone": "✓ Cleared!"
+  "clearDiscoveredDone": "✓ Cleared!",
+  "discoveredSectionTitle": "Discovered branches (no color set)",
+  "removeDiscoveredTitle": "Remove from discovered branches",
+  "removeDiscoveredAriaLabel": "Remove \"{name}\" from discovered branches"
 }

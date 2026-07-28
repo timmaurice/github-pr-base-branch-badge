@@ -1,4 +1,10 @@
-import { processedPRs, branchCache, discoveredBranches, loadDiscoveredBranches } from './state.js';
+import {
+  processedPRs,
+  branchCache,
+  discoveredBranches,
+  loadDiscoveredBranches,
+  resyncDiscoveredBranches
+} from './state.js';
 import { setupPRBadges } from './badge.js';
 import { refreshFilterUI } from './filterDropdown.js';
 import { loadColorSettings, loadGithubToken, loadUiLanguage } from './settings.js';
@@ -29,6 +35,14 @@ chrome.runtime.onMessage.addListener((message) => {
     discoveredBranches.clear();
     document.querySelectorAll('.base-branch-filter-btn').forEach((el) => el.remove());
     refreshFilterUI();
+  }
+
+  // Sent when the popup prunes one discovered branch rather than clearing
+  // all of them — the filter button itself doesn't need rebuilding since
+  // its popover content is re-rendered fresh from `discoveredBranches` on
+  // every open (see filterDropdown.js), so a Set resync is enough.
+  if (message.action === 'discoveredBranchesChanged') {
+    resyncDiscoveredBranches();
   }
 });
 

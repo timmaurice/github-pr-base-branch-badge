@@ -10,14 +10,25 @@ import {
 } from './state.js';
 import { getCachedBranch, setCachedBranch } from './storageCache.js';
 import { buildQueryForBaseBranches } from './query.js';
-import { adjustColor, resolveBranchColor } from './utils.js';
+import { adjustColor, resolveBranchColor, getContrastTextColor } from './utils.js';
 
-// Fetch PR details and add base branch badge. Sequential on purpose — firing
-// one request per row in parallel (a PR list page easily has 25+) reliably
-// tripped GitHub's secondary/abuse rate limit even with a fresh token that
-// had plenty of primary quota left.
+// Resolves badges for every not-yet-processed row from cache (memory or
+// storage, both local — no network), then fetches whatever's left over the
+// network. A GitHub PR list page is always a single repo, so any leftover
+// PRs share one owner/repo, and — if a token is set — GitHub's GraphQL API
+// can fetch all of their base branches in a SINGLE request (aliased
+// `pullRequest(number: ...)` fields) instead of one REST call per PR. This
+// is the main lever against the secondary/abuse rate limit: it's triggered
+// by request frequency, not total data fetched, so collapsing e.g. 25
+// requests into 1 helps far more than any per-request optimization would.
+// GraphQL requires auth, though (unauthenticated requests are rejected
+// outright), so without a token — or if the batch request itself fails —
+// this falls back to the original one-REST-call-per-PR flow, sequential on
+// purpose since parallel REST requests reliably tripped the same rate limit
+// even with plenty of primary quota left.
 export async function setupPRBadges() {
   const prRows = document.querySelectorAll('.Box-row');
+  const pending = [];
 
   for (const prRow of prRows) {
     if (prRow.querySelector('.base-branch-badge')) {
@@ -36,13 +47,34 @@ export async function setupPRBadges() {
     processedPRs.add(prUrl);
 
     if (branchCache.has(prUrl)) {
-      const baseBranch = branchCache.get(prUrl);
-      addBaseBranchBadge(prRow, prLink, baseBranch);
+      addBaseBranchBadge(prRow, prLink, branchCache.get(prUrl));
       continue;
     }
 
-    // Fetch the PR from the API before moving to the next row
-    await fetchAndExtractBaseBranch(prUrl, prRow, prLink);
+    const cachedBranch = await getCachedBranch(prUrl);
+    if (cachedBranch) {
+      branchCache.set(prUrl, cachedBranch);
+      addBaseBranchBadge(prRow, prLink, cachedBranch);
+      continue;
+    }
+
+    const parsed = parsePRUrl(prUrl);
+    if (!parsed) {
+      console.warn(`Base Branch Badge: could not parse PR URL: ${prUrl}`);
+      continue;
+    }
+
+    pending.push({ prUrl, prRow, prLink, parsed });
+  }
+
+  if (pending.length === 0) return;
+
+  if (githubToken) {
+    await fetchPendingViaGraphQL(pending);
+  } else {
+    for (const item of pending) {
+      await fetchAndExtractBaseBranch(item.prUrl, item.prRow, item.prLink);
+    }
   }
 }
 
@@ -51,6 +83,94 @@ function parsePRUrl(prUrl) {
   if (!match) return null;
   const [, owner, repo, number] = match;
   return { owner, repo, number };
+}
+
+// Groups pending PRs by repo (in practice always one group — a PR list page
+// is always a single repo — but grouping defensively costs nothing) and
+// fires one GraphQL request per group.
+async function fetchPendingViaGraphQL(pending) {
+  const groups = new Map();
+  for (const item of pending) {
+    const key = `${item.parsed.owner}/${item.parsed.repo}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(item);
+  }
+
+  for (const items of groups.values()) {
+    await fetchRepoBaseBranchesGraphQL(items);
+  }
+}
+
+const GRAPHQL_URL = 'https://api.github.com/graphql';
+
+async function fetchRepoBaseBranchesGraphQL(items) {
+  const { owner, repo } = items[0].parsed;
+  // JSON.stringify safely quotes/escapes owner/repo as GraphQL string
+  // literals; `number` is regex-restricted to digits in parsePRUrl, so it's
+  // safe to interpolate directly as an integer literal.
+  const fields = items
+    .map((item, i) => `pr${i}: pullRequest(number: ${item.parsed.number}) { baseRefName }`)
+    .join('\n');
+  const query = `query {
+  repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(repo)}) {
+    ${fields}
+  }
+}`;
+
+  try {
+    const response = await fetch(GRAPHQL_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${githubToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ query })
+    });
+
+    if (!response.ok) {
+      console.warn(
+        `Base Branch Badge: GraphQL batch request failed (${response.status}) for ${owner}/${repo} — falling back to individual requests.`
+      );
+      await fetchItemsIndividually(items);
+      return;
+    }
+
+    const payload = await response.json();
+    const repoData = payload.data && payload.data.repository;
+
+    if (payload.errors) {
+      // GraphQL can return partial data alongside per-field errors (e.g. one
+      // PR number that no longer exists) — log once, then let the per-item
+      // "missing baseRefName" fallback below handle whichever ones failed.
+      console.warn(
+        `Base Branch Badge: GraphQL returned errors for ${owner}/${repo}`,
+        payload.errors
+      );
+    }
+
+    const misses = [];
+    items.forEach((item, i) => {
+      const baseBranch = repoData && repoData[`pr${i}`] && repoData[`pr${i}`].baseRefName;
+      if (baseBranch) {
+        branchCache.set(item.prUrl, baseBranch);
+        setCachedBranch(item.prUrl, baseBranch);
+        addBaseBranchBadge(item.prRow, item.prLink, baseBranch);
+      } else {
+        misses.push(item);
+      }
+    });
+
+    if (misses.length > 0) await fetchItemsIndividually(misses);
+  } catch (error) {
+    console.error('Base Branch Badge: error fetching PR batch via GraphQL', error);
+    await fetchItemsIndividually(items);
+  }
+}
+
+async function fetchItemsIndividually(items) {
+  for (const item of items) {
+    await fetchAndExtractBaseBranch(item.prUrl, item.prRow, item.prLink);
+  }
 }
 
 async function fetchAndExtractBaseBranch(prUrl, prRow, prLink) {
@@ -178,10 +298,12 @@ function addBaseBranchBadge(prRow, prLink, baseBranch) {
 
   // Per-branch color as custom properties rather than a full style.cssText
   // block, so styles.css still owns :hover/:active (see CLAUDE.md).
+  const textColor = getContrastTextColor(bgColor);
   badge.style.setProperty('--badge-bg', bgColor);
   badge.style.setProperty('--badge-border', adjustColor(bgColor, -20));
   badge.style.setProperty('--badge-hover-bg', adjustColor(bgColor, 20));
+  badge.style.setProperty('--badge-text', textColor);
+  badge.classList.toggle('base-branch-badge--dark-text', textColor !== '#ffffff');
 
-  // Insert badge right after the PR link
   prLink.parentNode.insertBefore(badge, prLink.nextSibling);
 }

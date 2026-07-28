@@ -16,6 +16,7 @@ let paletteIndex = 0;
 // round-trip.
 let currentLang = I18N_DEFAULT_LANG;
 let currentColors = DEFAULT_COLORS;
+let currentDiscovered = [];
 
 function t(key, args) {
   return i18nText(currentLang, key, args);
@@ -28,6 +29,11 @@ const tokenTestBtn = document.getElementById('token-test-btn');
 const tokenTestResult = document.getElementById('token-test-result');
 const languageSelect = document.getElementById('language-select');
 const clearDiscoveredBtn = document.getElementById('clear-discovered-btn');
+const discoveredSection = document.getElementById('discovered-section');
+const discoveredTitleText = document.getElementById('discovered-title-text');
+const discoveredChips = document.getElementById('discovered-chips');
+
+document.getElementById('version-footer').textContent = `v${chrome.runtime.getManifest().version}`;
 
 document.addEventListener('DOMContentLoaded', loadSettings);
 document.getElementById('save-btn').addEventListener('click', saveSettings);
@@ -56,7 +62,9 @@ function toggleTokenVisibility() {
 
 function onLanguageChange() {
   currentLang = languageSelect.value;
-  chrome.storage.local.set({ uiLanguage: currentLang }, () => {
+  // Synced (not local) so the language choice follows the user to any other
+  // machine signed into the same Chrome/Google account — see CLAUDE.md.
+  chrome.storage.sync.set({ uiLanguage: currentLang }, () => {
     i18nReady(currentLang, () => {
       applyStaticTranslations();
       renderRows(currentColors);
@@ -69,8 +77,49 @@ function clearDiscoveredBranches() {
   if (!window.confirm(t('clearDiscoveredConfirm'))) return;
 
   chrome.storage.local.set({ discoveredBranches: [] }, () => {
+    currentDiscovered = [];
+    renderDiscoveredBranches();
     broadcastToGithubTabs('clearDiscoveredBranches');
     showStatus(t('clearDiscoveredDone'), 'success');
+  });
+}
+
+// Only branches with no configured color are shown here — colored ones stay
+// in the filter dropdown regardless of `discoveredBranches` (see
+// filterDropdown.js), so removing them from this list wouldn't do anything
+// visible and would just be confusing.
+function renderDiscoveredBranches() {
+  const coloredNames = new Set(Object.keys(currentColors));
+  const extras = currentDiscovered.filter((name) => !coloredNames.has(name)).sort();
+
+  discoveredChips.innerHTML = '';
+  discoveredSection.style.display = extras.length ? '' : 'none';
+
+  extras.forEach((branch) => {
+    const chip = document.createElement('span');
+    chip.className = 'discovered-chip';
+
+    const label = document.createElement('span');
+    label.textContent = branch;
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'discovered-chip-remove';
+    removeBtn.textContent = '✕';
+    removeBtn.title = t('removeDiscoveredTitle');
+    removeBtn.setAttribute('aria-label', t('removeDiscoveredAriaLabel', { name: branch }));
+    removeBtn.addEventListener('click', () => removeDiscoveredBranch(branch));
+
+    chip.append(label, removeBtn);
+    discoveredChips.appendChild(chip);
+  });
+}
+
+function removeDiscoveredBranch(branch) {
+  currentDiscovered = currentDiscovered.filter((name) => name !== branch);
+  chrome.storage.local.set({ discoveredBranches: currentDiscovered }, () => {
+    renderDiscoveredBranches();
+    broadcastToGithubTabs('discoveredBranchesChanged');
   });
 }
 
@@ -88,6 +137,7 @@ function applyStaticTranslations() {
   document.getElementById('save-btn').textContent = t('saveBtn');
   document.getElementById('reset-btn').textContent = t('resetBtn');
   clearDiscoveredBtn.textContent = t('clearDiscoveredBtn');
+  discoveredTitleText.textContent = t('discoveredSectionTitle');
 }
 
 // Verifies the token in the input field (not the saved one) against the
@@ -138,17 +188,38 @@ function showTokenResult(message, type) {
 }
 
 function loadSettings() {
-  chrome.storage.local.get(['branchColors', 'githubToken', 'uiLanguage'], (result) => {
-    currentLang = result.uiLanguage || I18N_DEFAULT_LANG;
+  // branchColors/uiLanguage live in storage.sync (so they follow the user
+  // across machines); githubToken and discoveredBranches stay local-only —
+  // the token for security (never want it round-tripping through a Google
+  // account), discoveredBranches because it's a large, ever-growing cache
+  // that isn't worth the sync quota (see CLAUDE.md).
+  chrome.storage.local.get(
+    ['githubToken', 'discoveredBranches', 'branchColors', 'uiLanguage'],
+    (localResult) => {
+      chrome.storage.sync.get(['branchColors', 'uiLanguage'], (syncResult) => {
+        currentLang = syncResult.uiLanguage || localResult.uiLanguage || I18N_DEFAULT_LANG;
+        currentColors = syncResult.branchColors || localResult.branchColors || DEFAULT_COLORS;
+        currentDiscovered = localResult.discoveredBranches || [];
 
-    i18nReady(currentLang, () => {
-      applyStaticTranslations();
+        // One-time migration for installs that already had local settings
+        // from before sync support existed: copy them up so they show up
+        // on other machines too, without waiting for the user to hit Save.
+        if (!syncResult.branchColors && localResult.branchColors) {
+          chrome.storage.sync.set({ branchColors: localResult.branchColors });
+        }
+        if (!syncResult.uiLanguage && localResult.uiLanguage) {
+          chrome.storage.sync.set({ uiLanguage: localResult.uiLanguage });
+        }
 
-      currentColors = result.branchColors || DEFAULT_COLORS;
-      renderRows(currentColors);
-      tokenInput.value = result.githubToken || '';
-    });
-  });
+        i18nReady(currentLang, () => {
+          applyStaticTranslations();
+          renderRows(currentColors);
+          renderDiscoveredBranches();
+          tokenInput.value = localResult.githubToken || '';
+        });
+      });
+    }
+  );
 }
 
 function renderRows(colors) {
@@ -393,20 +464,24 @@ function saveSettings() {
 
   const githubToken = tokenInput.value.trim();
 
-  chrome.storage.local.set({ branchColors: colors, githubToken }, () => {
-    currentColors = colors;
-    showStatus(t('statusSaved'), 'success');
-    renderRows(colors);
-    broadcastToGithubTabs('reloadBadges');
+  chrome.storage.local.set({ githubToken }, () => {
+    chrome.storage.sync.set({ branchColors: colors }, () => {
+      currentColors = colors;
+      showStatus(t('statusSaved'), 'success');
+      renderRows(colors);
+      renderDiscoveredBranches();
+      broadcastToGithubTabs('reloadBadges');
+    });
   });
 }
 
 function resetSettings() {
   if (!window.confirm(t('confirmReset'))) return;
 
-  chrome.storage.local.set({ branchColors: DEFAULT_COLORS }, () => {
+  chrome.storage.sync.set({ branchColors: DEFAULT_COLORS }, () => {
     currentColors = DEFAULT_COLORS;
     renderRows(DEFAULT_COLORS);
+    renderDiscoveredBranches();
     showStatus(t('statusReset'), 'success');
     broadcastToGithubTabs('reloadBadges');
   });

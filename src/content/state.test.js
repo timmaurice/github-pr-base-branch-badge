@@ -1,6 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { discoveredBranches, loadDiscoveredBranches, rememberDiscoveredBranch } from './state.js';
+import {
+  discoveredBranches,
+  loadDiscoveredBranches,
+  rememberDiscoveredBranch,
+  resyncDiscoveredBranches
+} from './state.js';
 
 // discoveredBranches is a module-level Set shared by every test in this
 // file (state.js has no reset hook) — each test clears it up front rather
@@ -78,4 +83,27 @@ test('loadDiscoveredBranches tolerates no persisted value', () => {
   loadDiscoveredBranches();
 
   assert.deepEqual([...discoveredBranches], []);
+});
+
+test('resyncDiscoveredBranches drops a name no longer in storage', () => {
+  discoveredBranches.clear();
+  discoveredBranches.add('develop');
+  discoveredBranches.add('staging');
+  globalThis.chrome = {
+    storage: {
+      local: {
+        get(key, callback) {
+          callback({ discoveredBranches: ['staging'] });
+        }
+      }
+    }
+  };
+
+  let callbackCalled = false;
+  resyncDiscoveredBranches(() => {
+    callbackCalled = true;
+  });
+
+  assert.deepEqual([...discoveredBranches], ['staging']);
+  assert.equal(callbackCalled, true);
 });

@@ -1,6 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { getSelectedBaseBranches, removeBaseFilters, buildQueryForBaseBranches } from './query.js';
+import {
+  getSelectedBaseBranches,
+  removeBaseFilters,
+  buildQueryForBaseBranches,
+  navigateToQuery
+} from './query.js';
 
 // getSelectedBaseBranches reads window.location.search directly with no way
 // to inject it, so tests stub a minimal `window` for the duration of each
@@ -62,4 +67,24 @@ test('buildQueryForBaseBranches builds a fresh open-PR query when the original i
 
 test('buildQueryForBaseBranches preserves is:closed from the original query', () => {
   assert.equal(buildQueryForBaseBranches(['main'], 'is:closed'), 'is:closed base:main');
+});
+
+test('navigateToQuery sets q and drops a stale page param', () => {
+  withWindowSearch('?page=5&q=is%3Apr+is%3Aopen', () => {
+    let assignedSearch;
+    // withWindowSearch's window.location has no setter for `search` — add
+    // one just for this test so navigateToQuery's assignment is observable.
+    Object.defineProperty(window.location, 'search', {
+      get: () => '?page=5&q=is%3Apr+is%3Aopen',
+      set: (value) => {
+        assignedSearch = value;
+      }
+    });
+
+    navigateToQuery('is:pr is:open base:electrolux');
+
+    const params = new URLSearchParams(assignedSearch);
+    assert.equal(params.get('q'), 'is:pr is:open base:electrolux');
+    assert.equal(params.has('page'), false);
+  });
 });

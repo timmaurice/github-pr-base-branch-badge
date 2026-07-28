@@ -9,12 +9,15 @@ A Chrome extension that shows the base (target) branch of pull requests in GitHu
 - ✅ **Base Branch Badge** - Shows the base branch as a colored badge (PR icon + name) next to each PR
 - ✅ **Click-to-Filter** - Clicking a badge instantly filters the list by exactly that base branch (open/closed filter state is preserved)
 - ✅ **Multi-Select Dropdown** - "Base Branch ▾" before the Author filter, mirroring GitHub's own "Filter by author": a checkbox list of all known branches, several selectable at once, shows the number of active filters as a badge on the button
-- ✅ **Popup Settings** - Customize colors per branch, add/rename/remove branches
+- ✅ **Popup Settings** - Customize colors per branch, add/rename/remove branches; badge text automatically switches between black/white for readability against light or dark colors
 - ✅ **Multilingual** - Language selector (English/German) in the popup, defaults to English; applies immediately to the popup and all open GitHub tabs
+- ✅ **Settings Sync** - Branch colors and language follow you to any other machine signed into the same Chrome/Google account (`chrome.storage.sync`); the token and discovered-branch cache stay local to each machine
 - ✅ **Persistent Caching** - Base branch (24h TTL) and once-seen branch names are cached in `chrome.storage.local`
+- ✅ **Batched Lookups** - With a token set, all of a page's not-yet-cached PRs are fetched in a single GraphQL request instead of one per PR (falls back to one-request-per-PR if that fails, or if no token is set)
 - ✅ **Dark Mode Support** - Automatically adapts to the OS color scheme
 - ✅ **Turbo-/Infinite-Scroll-Proof** - Works even with dynamically loaded-in PRs and when switching between the Issues/Pulls tabs, without a full page reload
 - ✅ **Automatic Retry** - Transient errors (GitHub's secondary rate limit, network errors) are automatically retried on the next scan (e.g. scrolling) instead of leaving the row without a badge permanently
+- ✅ **Keyboard Accessible** - The filter dropdown supports arrow-key navigation and Enter-to-toggle between branches, matching GitHub's own filter menus
 
 ## Installation
 
@@ -31,7 +34,7 @@ No Node/npm required — just download and load the extension:
 1. A colored badge with a PR icon and branch name appears next to every PR
 2. **Clicking a badge** filters the list by exactly that base branch
 3. **"Base Branch ▾"** opens a dropdown with checkboxes for all known branches — several can be checked at once, the selection applies immediately; the number on the button shows the count of active filters
-4. **Clicking the extension icon** opens the settings popup: change colors, add/rename/remove branches, set/test a token, switch language (EN/DE, applies immediately), reset discovered branches, save
+4. **Clicking the extension icon** opens the settings popup: change colors, add/rename/remove branches, set/test a token, switch language (EN/DE, applies immediately), remove individual discovered-but-uncolored branches (or reset all of them at once), save
 
 <img src="screenshots/filter-dropdown.png" alt="The &quot;Filter by target branch&quot; dropdown open, with a checkbox and color dot per known branch" width="350">
 
@@ -48,6 +51,8 @@ A branch entry's name can be a `*`-wildcard pattern instead of an exact name (e.
 ### Using it on private repos / raising the rate limit
 
 By default the extension works unauthenticated on public repos (60 API requests/hour, shared browser-wide). For private repos, or a higher limit (5000/hour), set a GitHub Personal Access Token in the popup — a fine-grained token with "Pull requests: Read-only" is enough. If a repo belongs to an organization and you get a 404 despite a set token, either get the org to approve fine-grained tokens, or use a classic token with the `repo` scope instead (see Troubleshooting below).
+
+Setting a token also switches lookups from one REST request per PR to a single batched GraphQL request per page (GitHub's GraphQL API requires authentication), which is both faster and much less likely to hit the secondary rate limit on large PR lists.
 
 ## Troubleshooting
 
@@ -80,15 +85,16 @@ By default the extension works unauthenticated on public repos (60 API requests/
 <summary>A branch is missing from the filter dropdown?</summary>
 
 - It must have been visible as a badge at least once (or be configured in the popup's color settings) for it to land in `discoveredBranches`
+- If it was renamed/deleted upstream, it can still linger in `discoveredBranches` — remove it individually in the popup (uncolored discovered branches are listed there) or use "Clear discovered branches" to reset all of them at once
 
 </details>
 
 ## Known Limitations
 
-- Every newly seen PR causes an extra API request to determine the base branch (only once per PR thanks to caching)
-- Without a token set: public repos only, 60 API requests/hour (shared across all extensions/tools that access the GitHub API unauthenticated)
+- Every newly seen PR causes an extra API request to determine the base branch (only once per PR thanks to caching; batched into one request per page when a token is set, one per PR otherwise)
+- Without a token set: public repos only, 60 API requests/hour (shared across all extensions/tools that access the GitHub API unauthenticated), and no GraphQL batching (GitHub's GraphQL API requires authentication)
 - Branch name matching is case-sensitive and must exactly match GitHub's name
-- `discoveredBranches` only grows (no automatic cleanup) — deleted/renamed branches remain visible in the filter dropdown until "Reset discovered branches" is manually triggered in the popup
+- `discoveredBranches` only grows on its own — the popup can remove individual uncolored branches or clear all of them, but nothing does this automatically
 - Language selection (EN/DE) only covers text rendered by the extension itself (badges, filter dropdown, popup) — not GitHub's own interface
 - `github.com` only, no GitHub Enterprise Server (own domain) — `manifest.json` would need to be extended with the corresponding domain for that
 
@@ -113,16 +119,20 @@ Other scripts:
 
 ### Creating a release
 
-1. Bump `manifest.json`'s `"version"`, commit
+1. `npm run version:bump -- <major|minor|patch|X.Y.Z>` — bumps `"version"` in both `manifest.json` and `package.json` together (see `scripts/bump-version.mjs`), then run `npm run format` and commit
 2. Push a `vX.Y.Z` tag (matching the new version) — `.github/workflows/release.yml` builds, tests, packages, and publishes the ZIP as a GitHub Release automatically
 
 ### Branch colors
 
-`popup.js` manages a color map (`branchColors`) in `chrome.storage.local`. Branch names are freely chosen (rename/add/remove in the popup) — `content.js` looks up the color generically by branch name and falls back to the "default" color if no entry exists. After saving, the popup sends a `reloadBadges` signal to all open GitHub tabs, which removes existing badges and redraws them with the new colors (from the in-memory cache, without a new network request).
+`popup.js` manages a color map (`branchColors`) in `chrome.storage.sync` (along with `uiLanguage`) so it follows the user across machines — `githubToken` and `discoveredBranches` stay in `chrome.storage.local` instead (security and storage-quota reasons, respectively; see CLAUDE.md). Branch names are freely chosen (rename/add/remove in the popup) — `content.js` looks up the color generically by branch name and falls back to the "default" color if no entry exists. After saving, the popup sends a `reloadBadges` signal to all open GitHub tabs, which removes existing badges and redraws them with the new colors (from the in-memory cache, without a new network request).
 
 A key may also be a `*`-wildcard pattern (e.g. `release/*`, `*-staging`) instead of an exact branch name. `resolveBranchColor()` in `src/content/utils.js` (used by both the badge and the filter dropdown's color dot) checks for an exact match first, then the wildcard patterns in `branchColors`' insertion order — i.e. the popup's row order, top to bottom — and only then falls back to `default`.
 
 Each row in the popup (`buildRow()` in `src/popup.js`) is one `.branch-row` element (a small CSS Grid: handle, name, swatch, hex, preview, remove), which is what makes native HTML5 drag-and-drop reordering possible — dragged by the grip handle (⠿) at the start of the row rather than the row as a whole, so starting a drag doesn't fight with text selection in the name/hex inputs. `dragstart` calls `dataTransfer.setDragImage(rowEl, ...)` so the whole row (not just the small handle) follows the cursor, and `dragover` shows a thin insertion-line indicator (`.drop-indicator-before`/`-after`, an inset `box-shadow` so it doesn't shift row height) at whichever edge of the hovered row the cursor is closer to. `moveRowTo()` then does a plain `insertBefore()` of the dragged row's element on drop — no index bookkeeping or rebuilding through the `branchColors` object needed, which would require unique keys and could silently collapse rows sharing a duplicate/empty name while mid-edit.
+
+### Base branch lookups: GraphQL batch vs. REST fallback
+
+`setupPRBadges()` (`src/content/badge.js`) first resolves whatever it can from the in-memory/storage cache, then fetches the rest over the network. A PR list page is always a single repo, so if a token is set, every remaining PR on the page is fetched in **one** GraphQL request (aliased `pr0: pullRequest(number: ...) { baseRefName }` fields per PR) instead of one REST call each — this is what actually helps against the secondary rate limit, since that limit is triggered by request frequency, not total data transferred. GraphQL requires authentication, so this only runs with a token; without one (or if the batch request itself fails, or a particular PR comes back `null`), it falls back to the original sequential-REST-per-PR path.
 
 ### Multi-selection in the filter
 
