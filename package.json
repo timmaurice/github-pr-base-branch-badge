@@ -1,7 +1,7 @@
 {
   "name": "github-pr-base-branch-badge",
   "private": true,
-  "version": "1.3.0",
+  "version": "1.3.1",
   "type": "module",
   "description": "Chrome extension — source lives in src/, esbuild + sass bundle it into the gitignored dist/ that manifest.json/popup.html reference",
   "engines": {
