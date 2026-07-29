@@ -295,8 +295,15 @@ function addBaseBranchBadge(prRow, prLink, baseBranch) {
   branchLabel.textContent = baseBranch;
   badge.appendChild(branchLabel);
   // Clicking a badge selects ONLY this branch (replacing any other
-  // selection) — the toolbar dropdown is the tool for multi-select.
-  badge.href = `?q=${encodeURIComponent(buildQueryForBaseBranches([baseBranch]))}`;
+  // selection) — the toolbar dropdown is the tool for multi-select. Built as
+  // an absolute /owner/repo/pulls path (from prLink's own href) rather than
+  // a page-relative "?q=..." one, since setupPRBadges() also badges PR rows
+  // on pages other than /pulls itself (e.g. the related-PRs list on a
+  // /compare/... page) — a relative href there would resolve against the
+  // /compare/... URL instead of navigating to the PR list at all.
+  const parsedLink = parsePRUrl(prLink.getAttribute('href'));
+  const listPath = parsedLink ? `/${parsedLink.owner}/${parsedLink.repo}/pulls` : '';
+  badge.href = `${listPath}?q=${encodeURIComponent(buildQueryForBaseBranches([baseBranch]))}`;
   badge.title = i18nText(uiLanguage, 'badgeTitle', { branch: baseBranch });
 
   // Per-branch color as custom properties rather than a full style.cssText

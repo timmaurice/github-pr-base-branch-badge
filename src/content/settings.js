@@ -1,12 +1,12 @@
 import { i18nReady, I18N_DEFAULT_LANG } from '../shared/i18n.js';
 import { setBranchColors, setGithubToken, setUiLanguage } from './state.js';
-import { repoKeyFromPath } from '../shared/repoKey.js';
+import { repoKeyFromPagePath } from '../shared/repoKey.js';
 import { storageGet } from './chromeStorage.js';
 
 // Fallback chain (repo → template → legacy global → DEFAULT_COLORS) — see
 // CLAUDE.md's "Branch colors" section.
 export function loadColorSettings(callback) {
-  const repoKey = repoKeyFromPath(window.location.pathname);
+  const repoKey = repoKeyFromPagePath(window.location.pathname);
   const repoStorageKey = repoKey ? `repoBranchColors:${repoKey}` : null;
 
   storageGet('local', 'branchColors', (localResult) => {

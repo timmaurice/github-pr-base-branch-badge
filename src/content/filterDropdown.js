@@ -233,8 +233,16 @@ function renderFilterPopoverContent(popover, onClose) {
   popover.innerHTML = '';
   popover.appendChild(buildFilterPopoverHeader(onClose));
 
+  // GitHub's `base:` search qualifier only matches an exact branch name, not
+  // a wildcard pattern — a configured `release/*`-style key only exists to
+  // color-match real branch names (see resolveBranchColor/utils.js) and
+  // isn't itself something `base:` can filter on, so it's excluded here even
+  // though it's a real, colorable entry in the popup's branch-color list.
   const allBranches = Array.from(
-    new Set([...Object.keys(branchColors).filter((k) => k !== 'default'), ...discoveredBranches])
+    new Set([
+      ...Object.keys(branchColors).filter((k) => k !== 'default' && !k.includes('*')),
+      ...discoveredBranches
+    ])
   ).sort();
 
   if (allBranches.length === 0) {

@@ -1,5 +1,5 @@
 import { I18N_DEFAULT_LANG } from '../shared/i18n.js';
-import { repoKeyFromPath } from '../shared/repoKey.js';
+import { repoKeyFromPagePath } from '../shared/repoKey.js';
 import { storageGet, storageSet } from './chromeStorage.js';
 
 // Cache for processed PRs to avoid duplicate fetches
@@ -46,7 +46,7 @@ export const PULL_REQUEST_ICON_SVG =
 // "unknown" bucket where there's no window.location (unit tests).
 function discoveredBranchesStorageKey() {
   const repoKey =
-    (typeof window !== 'undefined' && repoKeyFromPath(window.location.pathname)) || 'unknown';
+    (typeof window !== 'undefined' && repoKeyFromPagePath(window.location.pathname)) || 'unknown';
   return `discoveredBranches:${repoKey}`;
 }
 
