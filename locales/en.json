@@ -50,6 +50,8 @@
   "repoContextLabel": "Editing colors for {repo}",
   "repoContextTemplateLabel": "No active GitHub repo tab detected — editing the default template used for new repos",
 
+  "updateAvailable": "Update available: v{version}",
+
   "addSuggestedBranchTitle": "Add as a colored branch",
   "scanBranchesBtn": "🔎 Scan branches",
   "scanBranchesTitle": "Looks at recent PRs (open and closed) and suggests only the branches they actually target — not every git branch in the repo",

@@ -52,7 +52,9 @@ const discoveredChips = document.getElementById('discovered-chips');
 const repoContext = document.getElementById('repo-context');
 const scanBranchesBtn = document.getElementById('scan-branches-btn');
 
-document.getElementById('version-footer').textContent = `v${chrome.runtime.getManifest().version}`;
+let latestUpdate = null;
+
+renderUpdateNotice();
 
 document.addEventListener('DOMContentLoaded', loadSettings);
 document.getElementById('save-btn').addEventListener('click', saveSettings);
@@ -89,9 +91,35 @@ function onLanguageChange() {
       applyStaticTranslations();
       renderRepoContext();
       renderRows(currentColors);
+      renderUpdateNotice();
       broadcastToGithubTabs('reloadBadges');
     });
   });
+}
+
+// Not on the Chrome Web Store yet (see CLAUDE.md), so Chrome never
+// auto-updates the extension for users — this footer link is the only
+// signal they get that a newer release exists.
+function checkForUpdate() {
+  chrome.runtime.sendMessage({ action: 'checkForUpdate' }, (update) => {
+    latestUpdate = update || null;
+    renderUpdateNotice();
+  });
+}
+
+function renderUpdateNotice() {
+  const footer = document.getElementById('version-footer');
+  footer.textContent = `v${chrome.runtime.getManifest().version}`;
+
+  if (latestUpdate && latestUpdate.version) {
+    footer.append(' · ');
+    const link = document.createElement('a');
+    link.href = latestUpdate.url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.textContent = t('updateAvailable', { version: latestUpdate.version });
+    footer.appendChild(link);
+  }
 }
 
 function clearDiscoveredBranches() {
@@ -369,6 +397,7 @@ function loadSettings() {
               renderRows(currentColors);
               renderDiscoveredBranches();
               tokenInput.value = localResult.githubToken || '';
+              checkForUpdate();
             });
           }
         );

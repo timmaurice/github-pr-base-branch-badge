@@ -50,6 +50,8 @@
   "repoContextLabel": "Farben werden bearbeitet für {repo}",
   "repoContextTemplateLabel": "Kein aktiver GitHub-Repo-Tab erkannt — es wird die Standardvorlage für neue Repos bearbeitet",
 
+  "updateAvailable": "Update verfügbar: v{version}",
+
   "addSuggestedBranchTitle": "Als eingefärbten Branch hinzufügen",
   "scanBranchesBtn": "🔎 Branches scannen",
   "scanBranchesTitle": "Schaut sich aktuelle PRs (offen und geschlossen) an und schlägt nur die Branches vor, die tatsächlich als Ziel dienen — nicht jeden Git-Branch im Repo",

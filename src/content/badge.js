@@ -79,8 +79,19 @@ export async function setupPRBadges() {
   }
 }
 
+// prUrl is whatever the PR link's raw href attribute was. GitHub renders
+// this root-relative ("/owner/repo/pull/1") on PR list pages, but as a full
+// absolute URL on other pages that link to PRs (e.g. the related-PRs list on
+// a /compare/... page) — parse via the URL constructor rather than a
+// path-only regex so both forms resolve the same way.
 function parsePRUrl(prUrl) {
-  const match = prUrl.match(/^\/?([^/]+)\/([^/]+)\/pull\/(\d+)/);
+  let pathname;
+  try {
+    pathname = new URL(prUrl, window.location.origin).pathname;
+  } catch {
+    return null;
+  }
+  const match = pathname.match(/^\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
   if (!match) return null;
   const [, owner, repo, number] = match;
   return { owner, repo, number };

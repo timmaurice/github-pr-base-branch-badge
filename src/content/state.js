@@ -1,5 +1,6 @@
 import { I18N_DEFAULT_LANG } from '../shared/i18n.js';
 import { repoKeyFromPath } from '../shared/repoKey.js';
+import { storageGet, storageSet } from './chromeStorage.js';
 
 // Cache for processed PRs to avoid duplicate fetches
 export const processedPRs = new Set();
@@ -55,7 +56,7 @@ function discoveredBranchesStorageKey() {
 // they're no longer visible in the (now filtered) PR list.
 export function loadDiscoveredBranches() {
   const key = discoveredBranchesStorageKey();
-  chrome.storage.local.get(key, (result) => {
+  storageGet('local', key, (result) => {
     (result[key] || []).forEach((b) => discoveredBranches.add(b));
   });
 }
@@ -63,7 +64,7 @@ export function loadDiscoveredBranches() {
 export function rememberDiscoveredBranch(branch) {
   if (discoveredBranches.has(branch)) return;
   discoveredBranches.add(branch);
-  chrome.storage.local.set({ [discoveredBranchesStorageKey()]: Array.from(discoveredBranches) });
+  storageSet('local', { [discoveredBranchesStorageKey()]: Array.from(discoveredBranches) });
 }
 
 // Re-syncs the in-memory set with what's actually persisted, dropping any
@@ -72,7 +73,7 @@ export function rememberDiscoveredBranch(branch) {
 // removal must actually disappear from the open tab's filter dropdown.
 export function resyncDiscoveredBranches(callback) {
   const key = discoveredBranchesStorageKey();
-  chrome.storage.local.get(key, (result) => {
+  storageGet('local', key, (result) => {
     discoveredBranches.clear();
     (result[key] || []).forEach((b) => discoveredBranches.add(b));
     if (callback) callback();

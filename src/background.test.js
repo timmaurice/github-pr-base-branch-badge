@@ -29,6 +29,9 @@ globalThis.chrome = {
     },
     getURL(path) {
       return `chrome-extension://test-id/${path}`;
+    },
+    getManifest() {
+      return { version: '1.2.1' };
     }
   }
 };
@@ -189,6 +192,94 @@ test('pruneExpiredBranchCache does not call remove when nothing is expired', () 
   };
 
   pruneOnInstalled();
+});
+
+test('checkForUpdate reports a newer release when one is published', async () => {
+  let stored;
+  globalThis.chrome.storage = {
+    local: {
+      get(key, callback) {
+        callback({});
+      },
+      set(items) {
+        stored = items;
+      }
+    }
+  };
+  globalThis.fetch = async () => ({
+    ok: true,
+    json: async () => ({ tag_name: 'v1.3.0', html_url: 'https://example.com/releases/v1.3.0' })
+  });
+
+  const response = await sendMessage({ action: 'checkForUpdate' });
+  assert.deepEqual(response, { version: '1.3.0', url: 'https://example.com/releases/v1.3.0' });
+  assert.deepEqual(stored.updateCheck.result, response);
+});
+
+test('checkForUpdate reports nothing when already on the latest release', async () => {
+  globalThis.chrome.storage = {
+    local: {
+      get(key, callback) {
+        callback({});
+      },
+      set() {}
+    }
+  };
+  globalThis.fetch = async () => ({
+    ok: true,
+    json: async () => ({ tag_name: 'v1.2.1', html_url: 'https://example.com/releases/v1.2.1' })
+  });
+
+  const response = await sendMessage({ action: 'checkForUpdate' });
+  assert.equal(response, null);
+});
+
+test('checkForUpdate reuses a cached result within the 24h TTL instead of fetching again', async () => {
+  globalThis.chrome.storage = {
+    local: {
+      get(key, callback) {
+        callback({
+          updateCheck: {
+            result: { version: '1.3.0', url: 'https://example.com/releases/v1.3.0' },
+            checkedAt: Date.now() - 1000
+          }
+        });
+      }
+    }
+  };
+  globalThis.fetch = async () => {
+    assert.fail('should not fetch while the cached result is still fresh');
+  };
+
+  const response = await sendMessage({ action: 'checkForUpdate' });
+  assert.deepEqual(response, { version: '1.3.0', url: 'https://example.com/releases/v1.3.0' });
+});
+
+test('checkForUpdate falls back to the previous cached result when the fetch fails', async () => {
+  globalThis.chrome.storage = {
+    local: {
+      get(key, callback) {
+        callback({
+          updateCheck: {
+            result: { version: '1.3.0', url: 'https://example.com/releases/v1.3.0' },
+            checkedAt: Date.now() - 25 * 60 * 60 * 1000
+          }
+        });
+      },
+      set() {}
+    }
+  };
+  globalThis.fetch = async () => {
+    throw new Error('network error');
+  };
+  const originalConsoleError = console.error;
+  console.error = () => {};
+  try {
+    const response = await sendMessage({ action: 'checkForUpdate' });
+    assert.deepEqual(response, { version: '1.3.0', url: 'https://example.com/releases/v1.3.0' });
+  } finally {
+    console.error = originalConsoleError;
+  }
 });
 
 test('an unrecognized action is ignored without a response', () => {
