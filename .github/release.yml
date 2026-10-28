@@ -1,0 +1,21 @@
+# Categories for the notes `gh release create --generate-notes` writes in
+# .github/workflows/release.yml. GitHub sorts PRs by label only: label a PR
+# `bug` or `enhancement` to land in Fixes/Features; anything unlabeled goes
+# to "Other changes". Dependabot's dev-dependency bumps are left out entirely.
+changelog:
+  exclude:
+    labels:
+      - dependencies
+    authors:
+      - dependabot
+      - dependabot[bot]
+  categories:
+    - title: Features
+      labels:
+        - enhancement
+    - title: Fixes
+      labels:
+        - bug
+    - title: Other changes
+      labels:
+        - '*'
