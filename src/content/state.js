@@ -22,6 +22,14 @@ export function setBranchColors(colors) {
   branchColors = colors;
 }
 
+// Per-repo branch-name patterns (exact or `*` wildcard) hidden from the
+// filter dropdown — see isBranchIgnored() in shared/branchPatterns.js.
+// Badges still render for them; this only declutters the branch list.
+export let ignoredBranchPatterns = [];
+export function setIgnoredBranchPatterns(patterns) {
+  ignoredBranchPatterns = patterns;
+}
+
 // Optional PAT for the GitHub REST API — required for private repos, since
 // api.github.com is a different origin and doesn't receive github.com's
 // session cookies; also raises the rate limit from 60/h to 5000/h.

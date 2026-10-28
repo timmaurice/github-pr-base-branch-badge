@@ -59,5 +59,8 @@
   "scanBranchesDone": "✓ {count} Ziel-Branch(es) gefunden",
   "scanBranchesDoneTruncated": "✓ {count}+ Ziel-Branch(es) gefunden (Seitenlimit erreicht)",
   "scanBranchesFailed": "✗ Scan fehlgeschlagen: {message}",
-  "scanBranchesNoRepo": "✗ Kein aktives Repo zum Scannen"
+  "scanBranchesNoRepo": "✗ Kein aktives Repo zum Scannen",
+
+  "ignoredBranchesLabel": "Ausgeblendete Branches",
+  "ignoredBranchesHint": "Werden nicht im Filter-Dropdown und nicht in den Vorschlägen oben angezeigt. Mit Komma trennen, * als Platzhalter (z. B. release/*, feature/*). Badges an PRs zeigen diese Branches weiterhin an."
 }

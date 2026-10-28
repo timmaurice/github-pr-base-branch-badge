@@ -1,5 +1,11 @@
 import { i18nText } from '../shared/i18n.js';
-import { uiLanguage, branchColors, discoveredBranches, githubToken } from './state.js';
+import {
+  uiLanguage,
+  branchColors,
+  discoveredBranches,
+  githubToken,
+  ignoredBranchPatterns
+} from './state.js';
 import {
   getSelectedBaseBranches,
   buildQueryForBaseBranches,
@@ -8,6 +14,7 @@ import {
 } from './query.js';
 import { isPRListPage, resolveBranchColor } from './utils.js';
 import { repoKeyFromPath } from '../shared/repoKey.js';
+import { isBranchIgnored } from '../shared/branchPatterns.js';
 import { graphqlRequest } from './githubApi.js';
 
 // Adds a "Base Branch ▾" dropdown before the Author button, offering a
@@ -238,12 +245,18 @@ function renderFilterPopoverContent(popover, onClose) {
   // color-match real branch names (see resolveBranchColor/utils.js) and
   // isn't itself something `base:` can filter on, so it's excluded here even
   // though it's a real, colorable entry in the popup's branch-color list.
+  // Branches matching one of the repo's ignore patterns (popup setting) are
+  // left out too — unless currently selected, so an active filter can
+  // still be unchecked from here.
+  const selected = new Set(getSelectedBaseBranches());
   const allBranches = Array.from(
     new Set([
       ...Object.keys(branchColors).filter((k) => k !== 'default' && !k.includes('*')),
       ...discoveredBranches
     ])
-  ).sort();
+  )
+    .filter((branch) => selected.has(branch) || !isBranchIgnored(ignoredBranchPatterns, branch))
+    .sort();
 
   if (allBranches.length === 0) {
     const empty = document.createElement('div');
@@ -264,7 +277,6 @@ function renderFilterPopoverContent(popover, onClose) {
   popover.appendChild(listContainer);
   wireBranchListKeyboardNav(searchInput, listContainer);
 
-  const selected = new Set(getSelectedBaseBranches());
   const rowsByBranch = new Map();
   allBranches.forEach((branch) => {
     const row = buildBranchRow(branch, selected);

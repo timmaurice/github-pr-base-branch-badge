@@ -1,5 +1,6 @@
 import { I18N_DEFAULT_LANG, i18nReady, i18nText } from './shared/i18n.js';
 import { repoKeyFromPath } from './shared/repoKey.js';
+import { parseBranchPatterns, isBranchIgnored } from './shared/branchPatterns.js';
 
 // See CLAUDE.md's "Branch colors" section for the full per-repo storage
 // scheme (REPO_TEMPLATE_KEY, migration, resolveActiveRepoKey fallback chain).
@@ -7,6 +8,13 @@ function repoStorageKey(repoKey) {
   return `repoBranchColors:${repoKey}`;
 }
 const REPO_TEMPLATE_KEY = 'repoBranchColorsTemplate';
+
+// Ignored-branch patterns (hidden from the filter dropdown and from
+// suggestions here) — same per-repo/template scheme as the colors above.
+function repoIgnoredStorageKey(repoKey) {
+  return `repoIgnoredBranches:${repoKey}`;
+}
+const IGNORED_TEMPLATE_KEY = 'repoIgnoredBranchesTemplate';
 
 const DEFAULT_COLORS = {
   main: '#10b981',
@@ -51,6 +59,7 @@ const discoveredTitleText = document.getElementById('discovered-title-text');
 const discoveredChips = document.getElementById('discovered-chips');
 const repoContext = document.getElementById('repo-context');
 const scanBranchesBtn = document.getElementById('scan-branches-btn');
+const ignoredInput = document.getElementById('ignored-branches');
 
 let latestUpdate = null;
 
@@ -64,6 +73,8 @@ tokenToggleBtn.addEventListener('click', toggleTokenVisibility);
 languageSelect.addEventListener('change', onLanguageChange);
 clearDiscoveredBtn.addEventListener('click', clearDiscoveredBranches);
 scanBranchesBtn.addEventListener('click', scanBranches);
+// Live, before Save — same as an added suggestion disappearing right away.
+ignoredInput.addEventListener('input', renderDiscoveredBranches);
 
 // Broadcasts a message to every open github.com tab so content.js can react
 // (rebuild badges/filter UI) without requiring a manual page reload.
@@ -144,13 +155,17 @@ function currentRowNames() {
   );
 }
 
-// Suggestions: branches with no row yet (see CLAUDE.md's "Branch colors").
+// Suggestions: branches with no row yet (see CLAUDE.md's "Branch colors"),
+// minus whatever the ignore field currently matches (saved or not).
 // The header (title + scan button) stays visible with zero suggestions too,
 // whenever a repo is active — scanning is most useful exactly then.
 function renderDiscoveredBranches() {
   const coloredNames = currentRowNames();
+  const ignoredPatterns = parseBranchPatterns(ignoredInput.value);
   const extras = currentRepoKey
-    ? currentDiscovered.filter((name) => !coloredNames.has(name)).sort()
+    ? currentDiscovered
+        .filter((name) => !coloredNames.has(name) && !isBranchIgnored(ignoredPatterns, name))
+        .sort()
     : [];
 
   clearDiscoveredRow.style.display = currentRepoKey ? '' : 'none';
@@ -284,6 +299,8 @@ function applyStaticTranslations() {
   discoveredTitleText.textContent = t('discoveredSectionTitle');
   scanBranchesBtn.textContent = t('scanBranchesBtn');
   scanBranchesBtn.title = t('scanBranchesTitle');
+  document.getElementById('ignored-branches-label').textContent = t('ignoredBranchesLabel');
+  document.getElementById('ignored-branches-hint').textContent = t('ignoredBranchesHint');
 }
 
 // Verifies the token in the input field (not the saved one) against the
@@ -354,6 +371,7 @@ function loadSettings() {
     currentRepoKey = repoKey;
     const colorsKey = repoKey ? repoStorageKey(repoKey) : REPO_TEMPLATE_KEY;
     const discoveredKey = repoKey ? `discoveredBranches:${repoKey}` : null;
+    const ignoredKey = repoKey ? repoIgnoredStorageKey(repoKey) : IGNORED_TEMPLATE_KEY;
 
     // See CLAUDE.md's "Branch colors" for why colors/language are sync but
     // token/discoveredBranches stay local.
@@ -361,7 +379,14 @@ function loadSettings() {
       ['githubToken', discoveredKey, 'branchColors', 'uiLanguage'].filter(Boolean),
       (localResult) => {
         chrome.storage.sync.get(
-          [colorsKey, REPO_TEMPLATE_KEY, 'branchColors', 'uiLanguage'],
+          [
+            colorsKey,
+            REPO_TEMPLATE_KEY,
+            'branchColors',
+            'uiLanguage',
+            ignoredKey,
+            IGNORED_TEMPLATE_KEY
+          ],
           (syncResult) => {
             currentLang = syncResult.uiLanguage || localResult.uiLanguage || I18N_DEFAULT_LANG;
             currentColors =
@@ -371,6 +396,11 @@ function loadSettings() {
               localResult.branchColors ||
               EMPTY_SEED_COLORS;
             currentDiscovered = (discoveredKey && localResult[discoveredKey]) || [];
+            ignoredInput.value = (
+              syncResult[ignoredKey] ||
+              syncResult[IGNORED_TEMPLATE_KEY] ||
+              []
+            ).join(', ');
 
             // One-time migrations for installs from before this feature (or
             // before sync support) existed — see CLAUDE.md's "Branch colors".
@@ -660,10 +690,13 @@ function saveSettings() {
 
   const githubToken = tokenInput.value.trim();
   const colorsKey = currentRepoKey ? repoStorageKey(currentRepoKey) : REPO_TEMPLATE_KEY;
+  const ignoredKey = currentRepoKey ? repoIgnoredStorageKey(currentRepoKey) : IGNORED_TEMPLATE_KEY;
+  const ignoredPatterns = parseBranchPatterns(ignoredInput.value);
 
   chrome.storage.local.set({ githubToken }, () => {
-    chrome.storage.sync.set({ [colorsKey]: colors }, () => {
+    chrome.storage.sync.set({ [colorsKey]: colors, [ignoredKey]: ignoredPatterns }, () => {
       currentColors = colors;
+      ignoredInput.value = ignoredPatterns.join(', ');
       showStatus(t('statusSaved'), 'success');
       renderRows(colors);
       renderDiscoveredBranches();
