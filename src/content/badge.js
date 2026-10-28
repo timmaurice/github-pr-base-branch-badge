@@ -28,7 +28,7 @@ import { graphqlRequest } from './githubApi.js';
 // purpose since parallel REST requests reliably tripped the same rate limit
 // even with plenty of primary quota left.
 export async function setupPRBadges() {
-  const prRows = document.querySelectorAll('.Box-row');
+  const prRows = findPRRows();
   const pending = [];
 
   for (const prRow of prRows) {
@@ -36,21 +36,25 @@ export async function setupPRBadges() {
       continue;
     }
 
-    const prLink = prRow.querySelector('a[href*="/pull/"]');
+    const prLink = findPRLink(prRow);
     if (!prLink) continue;
 
     const prUrl = prLink.getAttribute('href');
+
+    // Checked before processedPRs on purpose: the React-rendered list can
+    // re-render a row and drop our badge, and an already-resolved branch
+    // should come back on the next observer pass instead of being skipped.
+    if (branchCache.has(prUrl)) {
+      processedPRs.add(prUrl);
+      addBaseBranchBadge(prRow, prLink, branchCache.get(prUrl));
+      continue;
+    }
 
     if (processedPRs.has(prUrl)) {
       continue;
     }
 
     processedPRs.add(prUrl);
-
-    if (branchCache.has(prUrl)) {
-      addBaseBranchBadge(prRow, prLink, branchCache.get(prUrl));
-      continue;
-    }
 
     const cachedBranch = await getCachedBranch(prUrl);
     if (cachedBranch) {
@@ -77,6 +81,27 @@ export async function setupPRBadges() {
       await fetchAndExtractBaseBranch(item.prUrl, item.prRow, item.prLink);
     }
   }
+}
+
+// GitHub's React PR list (rolled out late 2026) renders each PR as an <li>
+// whose title link carries data-testid="listitem-title-link"; its class
+// names are hashed (`listItem__X41oTe`) and change between deploys, so only
+// the testid is matched. `.Box-row` is the older server-rendered list, still
+// used on pages that haven't moved over (e.g. the related-PRs list on
+// /compare/...). Both are queried so either markup works.
+const PR_TITLE_LINK_SELECTOR = 'a[data-testid="listitem-title-link"][href*="/pull/"]';
+
+function findPRRows() {
+  const rows = new Set(document.querySelectorAll('.Box-row'));
+  document.querySelectorAll(PR_TITLE_LINK_SELECTOR).forEach((link) => {
+    const row = link.closest('li');
+    if (row) rows.add(row);
+  });
+  return rows;
+}
+
+function findPRLink(prRow) {
+  return prRow.querySelector(PR_TITLE_LINK_SELECTOR) || prRow.querySelector('a[href*="/pull/"]');
 }
 
 // prUrl is whatever the PR link's raw href attribute was. GitHub renders

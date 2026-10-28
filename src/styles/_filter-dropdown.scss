@@ -60,9 +60,10 @@
 .base-branch-filter-popover {
   display: none;
   flex-direction: column;
-  position: absolute;
-  top: 100%;
-  left: 0;
+  // Fixed, with top/left set from the button's rect by filterDropdown.js's
+  // positionPopover() — absolute positioning got clipped by the React PR
+  // list's overflow:hidden toolbar/list containers.
+  position: fixed;
   margin-top: 6px;
   width: 300px;
   max-height: 380px;
