@@ -6,22 +6,26 @@ A Chrome extension that shows the base (target) branch of pull requests in GitHu
 
 ## Features
 
-- ✅ **Base Branch Badge** - Shows the base branch as a colored badge (PR icon + name) next to each PR
-- ✅ **Click-to-Filter** - Clicking a badge instantly filters the list by exactly that base branch (open/closed filter state is preserved)
-- ✅ **Multi-Select Dropdown** - "Base Branch ▾" before the Author filter, mirroring GitHub's own "Filter by author": a checkbox list of all known branches, several selectable at once, shows the number of active filters as a badge on the button
-- ✅ **Per-Repo Colors** - Each repository gets its own branch → color list (a `main` branch in one repo can look completely different from `main` in another); the popup shows/edits whichever repo's tab is currently active
-- ✅ **Popup Settings** - Customize colors per branch, add/rename/remove branches; badge text automatically switches between black/white for readability against light or dark colors
-- ✅ **Multilingual** - Language selector (English/German) in the popup, defaults to English; applies immediately to the popup and all open GitHub tabs
-- ✅ **Settings Sync** - Branch colors (per repo) and language follow you to any other machine signed into the same Chrome/Google account (`chrome.storage.sync`); the token and discovered-branch cache stay local to each machine
-- ✅ **Persistent Caching** - Base branch (24h TTL) and once-seen branch names are cached in `chrome.storage.local`
-- ✅ **Batched Lookups** - With a token set, all of a page's not-yet-cached PRs are fetched in a single GraphQL request instead of one per PR (falls back to one-request-per-PR if that fails, or if no token is set)
-- ✅ **Per-Branch PR Counts** - With a token set, the filter dropdown shows each branch's current open (or closed) PR count next to its name
-- ✅ **Hidden Branches** - Per repo, hide branches (exact names or `*` patterns like `release/*`, `feature/*`) from the filter dropdown and the popup's suggestions — badges on PRs still show them
-- ✅ **Branch Suggestions** - The popup suggests real branch names as clickable chips (from badges seen so far, or an on-demand "Scan branches" button) instead of guessed example branches, so you only ever color branches that actually exist
-- ✅ **Dark Mode Support** - Automatically adapts to the OS color scheme
-- ✅ **Turbo-/Infinite-Scroll-Proof** - Works even with dynamically loaded-in PRs and when switching between the Issues/Pulls tabs, without a full page reload
-- ✅ **Automatic Retry** - Transient errors (GitHub's secondary rate limit, network errors) are automatically retried on the next scan (e.g. scrolling) instead of leaving the row without a badge permanently
-- ✅ **Keyboard Accessible** - The filter dropdown supports arrow-key navigation and Enter-to-toggle between branches, matching GitHub's own filter menus
+### On the PR list
+
+- **Base branch badges** — every PR shows its target branch as a colored badge; clicking one filters the list to that branch (open/closed state is kept).
+- **Multi-branch filter** — a "Target Branch ▾" dropdown next to GitHub's own filters. Check several branches at once; with a token set, each one shows its current PR count.
+- **Keyboard support** — arrow keys and Enter work in the dropdown, like in GitHub's own filter menus.
+- **Survives navigation** — keeps working with infinite scroll and when switching between Issues and Pulls without a page reload.
+
+### In the popup
+
+- **Per-repo colors** — each repo has its own branch → color list, with `*` patterns (e.g. `release/*`) and drag-to-reorder priority. Badge text switches between black and white to stay readable.
+- **Branch suggestions** — real branch names from badges seen so far, or from the "Scan branches" button, ready to add with one click.
+- **Hidden branches** — hide branches or patterns (e.g. `release/*, feature/*`) from the dropdown and the suggestions. Badges still show them.
+- **English and German** — switches the popup and all open GitHub tabs immediately.
+- **Synced settings** — colors, hidden branches and language follow your Chrome account. The token and the branch cache stay on each machine.
+
+### Under the hood
+
+- **Few API requests** — base branches are cached for 24h, and with a token all uncached PRs on a page are fetched in a single GraphQL request.
+- **Automatic retry** — rate-limit and network errors are retried on the next scan instead of leaving a PR without a badge.
+- **Light and dark mode** — the filter dropdown uses GitHub's own theme colors; the popup follows your OS setting.
 
 ## Installation
 
@@ -37,7 +41,7 @@ No Node/npm required — just download and load the extension:
 
 1. A colored badge with a PR icon and branch name appears next to every PR
 2. **Clicking a badge** filters the list by exactly that base branch
-3. **"Base Branch ▾"** opens a dropdown with checkboxes for all known branches — several can be checked at once, the selection applies immediately; the number on the button shows the count of active filters, and (with a token set) each branch shows its current PR count
+3. **"Target Branch ▾"** opens a dropdown with checkboxes for all known branches — several can be checked at once, the selection applies immediately; the number on the button shows the count of active filters, and (with a token set) each branch shows its current PR count
 4. **Clicking the extension icon** opens the settings popup: change colors, add/rename/remove branches, set/test a token, switch language (EN/DE, applies immediately), click a suggested branch to add it with a color (or dismiss/reset suggestions), save
 
 The popup always shows which repo's colors you're editing (a small line under the header) — it follows whichever GitHub PR/issues tab is currently active, or the repo you last edited if the active tab isn't a GitHub repo page.
