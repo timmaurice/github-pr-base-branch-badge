@@ -1,5 +1,11 @@
 import { i18nText } from '../shared/i18n.js';
-import { uiLanguage, branchColors, discoveredBranches, githubToken } from './state.js';
+import {
+  uiLanguage,
+  branchColors,
+  discoveredBranches,
+  githubToken,
+  ignoredBranchPatterns
+} from './state.js';
 import {
   getSelectedBaseBranches,
   buildQueryForBaseBranches,
@@ -8,6 +14,7 @@ import {
 } from './query.js';
 import { isPRListPage, resolveBranchColor } from './utils.js';
 import { repoKeyFromPath } from '../shared/repoKey.js';
+import { isBranchIgnored } from '../shared/branchPatterns.js';
 import { graphqlRequest } from './githubApi.js';
 
 // Adds a "Base Branch ▾" dropdown before the Author button, offering a
@@ -238,12 +245,18 @@ function renderFilterPopoverContent(popover, onClose) {
   // color-match real branch names (see resolveBranchColor/utils.js) and
   // isn't itself something `base:` can filter on, so it's excluded here even
   // though it's a real, colorable entry in the popup's branch-color list.
+  // Branches matching one of the repo's ignore patterns (popup setting) are
+  // left out too — unless currently selected, so an active filter can
+  // still be unchecked from here.
+  const selected = new Set(getSelectedBaseBranches());
   const allBranches = Array.from(
     new Set([
       ...Object.keys(branchColors).filter((k) => k !== 'default' && !k.includes('*')),
       ...discoveredBranches
     ])
-  ).sort();
+  )
+    .filter((branch) => selected.has(branch) || !isBranchIgnored(ignoredBranchPatterns, branch))
+    .sort();
 
   if (allBranches.length === 0) {
     const empty = document.createElement('div');
@@ -264,7 +277,6 @@ function renderFilterPopoverContent(popover, onClose) {
   popover.appendChild(listContainer);
   wireBranchListKeyboardNav(searchInput, listContainer);
 
-  const selected = new Set(getSelectedBaseBranches());
   const rowsByBranch = new Map();
   allBranches.forEach((branch) => {
     const row = buildBranchRow(branch, selected);
@@ -285,6 +297,17 @@ function renderFilterPopoverContent(popover, onClose) {
   }
 }
 
+// The popover is position: fixed (see _filter-dropdown.scss) so that no
+// overflow:hidden ancestor can clip it — the React PR list's toolbar and
+// list container both are. Fixed means viewport coordinates, so it's
+// anchored to the button's current on-screen position on open and again on
+// every scroll/resize while open (see the document-level listener below).
+function positionPopover(button, popover) {
+  const rect = button.getBoundingClientRect();
+  popover.style.top = `${rect.bottom}px`;
+  popover.style.left = `${rect.left}px`;
+}
+
 // Wires the button click → open/close + render-on-open behavior. Popover
 // content is (re)rendered fresh on every open rather than kept in sync
 // incrementally, since it only reflects cheap-to-recompute state (discovered
@@ -298,12 +321,16 @@ function wireFilterDropdownToggle(button, popover, closePopover) {
     });
     if (willOpen) {
       renderFilterPopoverContent(popover, closePopover);
+      positionPopover(button, popover);
       popover.style.display = 'flex';
       // Popover content is rebuilt fresh on every open, so the search input
       // needs to be re-focused each time too — a keyboard user reaching
       // this button expects to land somewhere useful, not nowhere.
+      // preventScroll: a plain focus() scrolls any overflow:hidden ancestor
+      // (the React toolbar has several) to reveal the input, shifting
+      // GitHub's own filter buttons out of view.
       const searchInput = popover.querySelector('.base-branch-filter-search');
-      if (searchInput) searchInput.focus();
+      if (searchInput) searchInput.focus({ preventScroll: true });
     }
     button.setAttribute('aria-expanded', String(willOpen));
   });
@@ -325,13 +352,37 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && currentDismissal) currentDismissal.closePopover();
 });
 
+function repositionOpenPopover() {
+  if (currentDismissal && currentDismissal.popover.style.display === 'flex') {
+    positionPopover(currentDismissal.button, currentDismissal.popover);
+  }
+}
+
+// Capture phase: scroll events don't bubble, and the page or any scrollable
+// ancestor moving the button should move the popover with it.
+document.addEventListener('scroll', repositionOpenPopover, true);
+window.addEventListener('resize', repositionOpenPopover);
+
 function ensureBaseBranchFilterButton() {
   if (!isPRListPage()) return;
 
-  const authorButton = document.querySelector('#author-select-menu');
+  // `button[aria-label="Filter by author"]` is the React PR list's Author
+  // picker (inside a Primer ActionBar, hashed class names only);
+  // `#author-select-menu` is the older server-rendered toolbar's.
+  const authorButton =
+    document.querySelector('button[aria-label="Filter by author"]') ||
+    document.querySelector('#author-select-menu');
   if (!authorButton) return;
 
-  const filterHeader = authorButton.parentElement;
+  // React list: insert before the whole ActionBar nav, not inside its
+  // role="toolbar" list — that list is overflow:hidden and only measures its
+  // own items for the "…" overflow menu, so an extra button in there just
+  // pushes GitHub's last filter onto a clipped second line. Next to the nav,
+  // the ActionBar sees less width and overflows its items normally.
+  // Server-rendered list: directly before the Author menu, as before.
+  const toolbar = authorButton.closest('[role="toolbar"]');
+  const anchor = toolbar && toolbar.parentElement ? toolbar.parentElement : authorButton;
+  const filterHeader = anchor.parentElement;
   if (!filterHeader) return;
 
   if (filterHeader.querySelector('.base-branch-filter-btn')) return;
@@ -348,11 +399,11 @@ function ensureBaseBranchFilterButton() {
   }
 
   wireFilterDropdownToggle(button, popover, closePopover);
-  currentDismissal = { wrapper, closePopover };
+  currentDismissal = { wrapper, button, popover, closePopover };
 
   wrapper.appendChild(button);
   wrapper.appendChild(popover);
-  filterHeader.insertBefore(wrapper, authorButton);
+  filterHeader.insertBefore(wrapper, anchor);
 }
 
 export function refreshFilterUI() {

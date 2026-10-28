@@ -1,3 +1,5 @@
+import { wildcardToRegExp } from '../shared/branchPatterns.js';
+
 export function isPRListPage() {
   return /\/pulls\/?$/.test(window.location.pathname);
 }
@@ -21,11 +23,6 @@ export function getContrastTextColor(hexColor) {
   const b = c & 0xff;
   const yiq = (r * 299 + g * 587 + b * 114) / 1000;
   return yiq >= 150 ? '#1f2937' : '#ffffff';
-}
-
-function wildcardToRegExp(pattern) {
-  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
-  return new RegExp(`^${escaped}$`);
 }
 
 // Looks up a branch's color, exact name first, then `*`-wildcard patterns

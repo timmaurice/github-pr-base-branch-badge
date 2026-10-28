@@ -1,18 +1,32 @@
 import { i18nReady, I18N_DEFAULT_LANG } from '../shared/i18n.js';
-import { setBranchColors, setGithubToken, setUiLanguage } from './state.js';
+import {
+  setBranchColors,
+  setGithubToken,
+  setUiLanguage,
+  setIgnoredBranchPatterns
+} from './state.js';
 import { repoKeyFromPagePath } from '../shared/repoKey.js';
 import { storageGet } from './chromeStorage.js';
 
 // Fallback chain (repo → template → legacy global → DEFAULT_COLORS) — see
-// CLAUDE.md's "Branch colors" section.
+// CLAUDE.md's "Branch colors" section. Also loads the repo's ignored-branch
+// patterns (repo → template → none), since every caller that needs fresh
+// colors (initial load, popup Save, Turbo navigation) needs those too.
 export function loadColorSettings(callback) {
   const repoKey = repoKeyFromPagePath(window.location.pathname);
   const repoStorageKey = repoKey ? `repoBranchColors:${repoKey}` : null;
+  const ignoredStorageKey = repoKey ? `repoIgnoredBranches:${repoKey}` : null;
 
   storageGet('local', 'branchColors', (localResult) => {
     storageGet(
       'sync',
-      [repoStorageKey, 'repoBranchColorsTemplate', 'branchColors'].filter(Boolean),
+      [
+        repoStorageKey,
+        'repoBranchColorsTemplate',
+        'branchColors',
+        ignoredStorageKey,
+        'repoIgnoredBranchesTemplate'
+      ].filter(Boolean),
       (syncResult) => {
         const colors =
           (repoStorageKey && syncResult[repoStorageKey]) ||
@@ -20,6 +34,11 @@ export function loadColorSettings(callback) {
           syncResult.branchColors ||
           localResult.branchColors;
         if (colors) setBranchColors(colors);
+        setIgnoredBranchPatterns(
+          (ignoredStorageKey && syncResult[ignoredStorageKey]) ||
+            syncResult.repoIgnoredBranchesTemplate ||
+            []
+        );
         if (callback) callback();
       }
     );

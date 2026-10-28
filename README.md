@@ -16,6 +16,7 @@ A Chrome extension that shows the base (target) branch of pull requests in GitHu
 - ✅ **Persistent Caching** - Base branch (24h TTL) and once-seen branch names are cached in `chrome.storage.local`
 - ✅ **Batched Lookups** - With a token set, all of a page's not-yet-cached PRs are fetched in a single GraphQL request instead of one per PR (falls back to one-request-per-PR if that fails, or if no token is set)
 - ✅ **Per-Branch PR Counts** - With a token set, the filter dropdown shows each branch's current open (or closed) PR count next to its name
+- ✅ **Hidden Branches** - Per repo, hide branches (exact names or `*` patterns like `release/*`, `feature/*`) from the filter dropdown and the popup's suggestions — badges on PRs still show them
 - ✅ **Branch Suggestions** - The popup suggests real branch names as clickable chips (from badges seen so far, or an on-demand "Scan branches" button) instead of guessed example branches, so you only ever color branches that actually exist
 - ✅ **Dark Mode Support** - Automatically adapts to the OS color scheme
 - ✅ **Turbo-/Infinite-Scroll-Proof** - Works even with dynamically loaded-in PRs and when switching between the Issues/Pulls tabs, without a full page reload
@@ -48,6 +49,10 @@ The popup always shows which repo's colors you're editing (a small line under th
 The first time you open the popup for a given repo, it only has the `default` fallback color — no guessed example branches, since a repo's actual branches vary too much for that to be useful. Instead, the popup suggests **real** branch names as chips under "Discovered branches": clicking one instantly adds it as a colored row (✕ dismisses it instead). Branches show up here automatically as PRs get badged, or immediately via the **"Scan branches"** button, which looks at the repo's recent PRs (open and closed) and suggests exactly the branches they target — not every git branch in the repo, most of which are never a PR's target and would just be noise.
 
 <img src="screenshots/popup-settings.png" alt="The settings popup showing which repo is being edited (home-assistant/core), branch entries (dev, master, rc) each with a drag handle, color swatch, hex input and remove button, the Default fallback row, a &quot;Discovered branches&quot; section with a &quot;Scan branches&quot; button, and Save/Reset buttons" width="400">
+
+### Hidden branches
+
+Repos with many short-lived target branches (`release/1.6.9`, `release/1.6.10`, `feature/...`) quickly clutter the filter dropdown. The popup's **"Hidden branches"** field takes a comma-separated list of exact names or `*` patterns (e.g. `release/*, feature/*`), saved per repo with the Save button. Matching branches disappear from the filter dropdown and from the "Discovered branches" suggestions (the suggestions update as you type). Badges on the PRs themselves are unaffected, and a hidden branch that's currently selected in the filter still shows in the dropdown so it can be unchecked.
 
 ### Wildcard patterns and priority
 
@@ -148,6 +153,8 @@ A genuinely brand-new repo (no template, no legacy config to migrate) seeds from
 
 - **Passively** — any branch seen as a PR's base while badges render (`rememberDiscoveredBranch()` in `badge.js`).
 - **On demand** — the **"Scan branches"** button (`scanBranches()`/`fetchRecentBaseBranches()`) pages through `GET /repos/{owner}/{repo}/pulls?state=all` (capped at `SCAN_BRANCHES_MAX_PAGES` × 100 PRs) and collects the distinct `base.ref` values PRs actually targeted. This deliberately isn't GitHub's plain `/repos/{owner}/{repo}/branches` endpoint — that returns every git branch in the repo (feature/personal/stale branches included), the vast majority of which are never a PR target and just added noise.
+
+**Hidden branches** are stored the same way as colors: `repoIgnoredBranches:<owner>/<repo>` (an array of exact names or `*` patterns) in `chrome.storage.sync`, with `repoIgnoredBranchesTemplate` as the fallback/no-active-repo key. `isBranchIgnored()` in `src/shared/branchPatterns.js` does the matching for both `filterDropdown.js` (branch list) and `popup.js` (suggestion chips).
 
 A key may also be a `*`-wildcard pattern (e.g. `release/*`, `*-staging`) instead of an exact branch name. `resolveBranchColor()` in `src/content/utils.js` (used by both the badge and the filter dropdown's color dot) checks for an exact match first, then the wildcard patterns in `branchColors`' insertion order — i.e. the popup's row order, top to bottom — and only then falls back to `default`.
 
